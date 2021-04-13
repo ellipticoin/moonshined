@@ -1,0 +1,12 @@
+.env
+**/*.rs.bk
+var/db
+var/state-dump.cbor
+var/transactions.cbor
+**/node_modules
+**/target
+ellipticoind/static/*
+
+.idea
+*.iml
+!.gitkeep

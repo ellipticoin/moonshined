@@ -1,0 +1,18 @@
+[package]
+name = "ellipticoin-test-framework"
+version = "0.1.4"
+authors = ["Mason Fischer <mason@kissr.co>"]
+description = "A framework for testing Ellipticoin smart contracts"
+license = "MIT"
+
+[dependencies]
+base64 = "0.13.0"
+ellipticoin_contracts = {path = "../ellipticoin_contracts"}
+ellipticoin_types = {path = "../ellipticoin_types"}
+hex = "0.3.2"
+hex-literal = "0.3.0"
+lazy_static = "1.1.0"
+num-bigint = "*"
+num-traits = "*"
+rand = "0.6.5"
+sha2 = "0.8.1"

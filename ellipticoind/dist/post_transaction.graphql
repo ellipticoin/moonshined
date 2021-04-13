@@ -1,0 +1,15 @@
+mutation PostTransaction($transaction: Bytes!) {
+  postTransaction(transaction: $transaction) {
+    id
+    networkId
+    blockNumber
+    position
+    contract
+    sender
+    transactionNumber
+    function
+    arguments
+    returnValue
+    raw
+  }
+}
