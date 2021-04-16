@@ -30,25 +30,36 @@ pub async fn start_miner() {
 }
 
 pub async fn catch_up() {
-    println!("Syncing complete");
+    println!("Applying past transactions");
     if Path::new("var/transactions.cbor").exists() {
         let transacations_file = File::open("var/transactions.cbor").unwrap();
+        let first_block_number = db::get_block_number().await;
+        let mut last_printed_block_number = 0;
         for transaction in Deserializer::from_reader(&transacations_file)
             .into_iter::<SignedTransaction>()
             .map(Result::unwrap)
         {
             let result = crate::transaction::apply(&transaction).await;
-            // println!("{:?} {} {} {:?}", transaction, transaction.sender().unwrap_or(Default::default()) == address(), transaction.is_seal(), result);
             if transaction.sender().unwrap_or(Default::default()) == address()
                 && transaction.is_seal()
                 && result.is_ok()
             {
                 hash_onion::peel().await;
             }
+            let block_number = db::get_block_number().await;
+            if block_number % 10000 == 0 && block_number != last_printed_block_number {
+                println!("Applied blocks #{}-#{}", block_number - 10000, block_number);
+                last_printed_block_number = block_number;
+            };
+
             let mut db = aquire_db_write_lock!();
             db.flush();
         }
         db::verify().await;
+        println!(
+            "Applied {} Transactions",
+            last_printed_block_number - first_block_number
+        );
     }
 }
 

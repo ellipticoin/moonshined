@@ -15,7 +15,7 @@ pub async fn generate() {
     let hash_onion_layers_left = get_hash_onion_layers_left()
         .await
         .unwrap_or(*HASH_ONION_SIZE as u64);
-    let pb = ProgressBar::new(hash_onion_layers_left - 1);
+    let pb = ProgressBar::new(hash_onion_layers_left);
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
