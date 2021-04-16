@@ -40,7 +40,9 @@ pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
     let body_json = request
         .body_json::<std::collections::HashMap<String, serde_json::value::Value>>()
         .await
-        .unwrap();
+        .map_err(|e| {
+            http_types::Error::from_str(StatusCode::BadRequest, e.to_string())
+        })?;
     let query: String = body_json
         .get("query")
         .unwrap_or(&serde_json::Value::Null)
