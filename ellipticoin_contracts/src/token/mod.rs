@@ -62,10 +62,10 @@ impl Token {
 
     pub fn get_underlying_price<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
         if token == LEVERAGED_BASE_TOKEN {
-            BASE_FACTOR
+            Self::amount_to_underlying(db, BASE_FACTOR, token)
         } else {
-            let balance = Self::get_price(db, token);
-            Self::amount_to_underlying(db, balance, token)
+            let price = Self::get_price(db, token);
+            Self::amount_to_underlying(db, price, token)
         }
     }
 

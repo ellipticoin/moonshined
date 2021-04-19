@@ -44,7 +44,11 @@ impl QueryRoot {
                 );
                 let interest_rate =
                     ellipticoin_contracts::Token::get_interest_rate(&mut db, token.clone().into());
-                let price = ellipticoin_contracts::Token::get_underlying_price(
+                let price = ellipticoin_contracts::Token::get_price(
+                    &mut db,
+                    token.clone().into(),
+                );
+                let underlying_price = ellipticoin_contracts::Token::get_underlying_price(
                     &mut db,
                     token.clone().into(),
                 );
@@ -59,6 +63,7 @@ impl QueryRoot {
                     interest_rate: interest_rate.map(|interest_rate| interest_rate.into()),
                     balance: balance.into(),
                     price: price.into(),
+                    underlying_price: underlying_price.into(),
                     total_supply: total_supply.into(),
                 }
             })
