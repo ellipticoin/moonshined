@@ -7,6 +7,7 @@ use async_std::{
 use broadcaster::BroadcastChannel;
 use futures::channel::oneshot;
 use once_cell::sync::OnceCell;
+
 use std::{
     fs::{File, OpenOptions},
     sync::Arc,
@@ -17,12 +18,14 @@ pub const NETWORK_ID: u64 = 0;
 pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();
 
 lazy_static! {
-    pub static ref TRANSACTIONS_FILE: File = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .create(true)
-        .open("var/transactions.cbor")
-        .unwrap();
+    pub static ref TRANSACTIONS_FILE: RwLock<File> = RwLock::new(
+        OpenOptions::new()
+            .write(true)
+            .append(true)
+            .create(true)
+            .open("var/transactions.cbor")
+            .unwrap()
+    );
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);
     pub static ref TRANSACTION_QUEUE_SIZE: usize = 1000;
     pub static ref TRANSACTION_QUEUE: (

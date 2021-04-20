@@ -23,7 +23,7 @@ pub async fn poll() {
         Poll::Ready(update) => {
             let ethereum_block_number = db::get_ethereum_block_number().await;
             if ethereum_block_number + 1 == update.block_number {
-                println!("Processed Ethereum Block #{}", ethereum_block_number);
+                println!("Processed Ethereum Block #{}", ethereum_block_number + 1);
             } else {
                 println!(
                     "Processed Ethereum Block #{}-#{}",

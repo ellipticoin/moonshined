@@ -1,6 +1,7 @@
 use indicatif::ProgressBar;
 use serde_cbor::Deserializer;
 use sled::Batch;
+use std::io::Write;
 use std::{collections::HashMap, fs::File};
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ impl SledBackend {
 
     pub fn dump(&self) {
         println!("\nDumping state...");
-        let file = File::create("var/state-dump.cbor").unwrap();
+        let mut file = File::create("var/state-dump.cbor").unwrap();
         let pb = ProgressBar::new(0);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
@@ -30,13 +31,21 @@ impl SledBackend {
         );
         let state_length = self.db.len();
         pb.set_length(state_length as u64);
-        for key_value in self.db.iter().map(|v| {
-            let (key, value) = v.unwrap();
-            (key.to_vec(), value.to_vec())
-        }) {
+        let mut buf = Vec::new();
+        for key_value in self
+            .db
+            .iter()
+            .map(|v| {
+                let (key, value) = v.unwrap();
+                (key.to_vec(), value.to_vec())
+            })
+            .collect::<Vec<(Vec<u8>, Vec<u8>)>>()
+            .iter()
+        {
             pb.inc(1);
-            serde_cbor::to_writer(&file, &key_value).unwrap();
+            buf.append(&mut serde_cbor::to_vec(&key_value).unwrap());
         }
+        file.write_all(&buf).unwrap();
         pb.finish();
     }
 
@@ -52,7 +61,18 @@ impl SledBackend {
             // if base64::encode(&key) == "AQAAAA==" {
             //     continue;
             // };
-            // println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(self.db.get(&key).unwrap_or(None).map(|v| v.to_vec()).unwrap_or(vec![])));
+            // println!(
+            //     "{}: {} == {}",
+            //     base64::encode(&key),
+            //     base64::encode(&value),
+            //     base64::encode(
+            //         self.db
+            //             .get(&key)
+            //             .unwrap_or(None)
+            //             .map(|v| v.to_vec())
+            //             .unwrap_or(vec![])
+            //     )
+            // );
             assert!(
                 self.db
                     .get(&key)

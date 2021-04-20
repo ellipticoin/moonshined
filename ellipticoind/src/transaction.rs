@@ -123,8 +123,8 @@ pub async fn run(transaction: SignedTransaction) -> Result<()> {
     } else {
         db.revert();
     }
-    // println!("writing to file: {:?}", transaction);
-    serde_cbor::to_writer(&*TRANSACTIONS_FILE, &transaction).unwrap();
+    let transacations_file = TRANSACTIONS_FILE.write().await;
+    serde_cbor::to_writer(&*transacations_file, &transaction).unwrap();
 
     result
 }
