@@ -11,7 +11,7 @@ use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::{cast::ToPrimitive, pow};
 
 use hex;
@@ -25,7 +25,7 @@ impl Contract for Token {
 db_accessors!(Token {
     balance(address: Address, token: Address) -> u64;
     base_token_interest_rate() -> u64;
-    base_token_exchange_rate() -> BigInt;
+    base_token_exchange_rate() -> BigUint;
     total_supply(token: Address) -> u64;
 });
 
@@ -43,41 +43,32 @@ impl Token {
         address: Address,
         token: Address,
     ) -> u64 {
-        if token == LEVERAGED_BASE_TOKEN {
-            let balance = Self::get_balance(db, address, token);
-            Self::amount_to_underlying(db, balance, token)
-        } else {
-            Self::get_balance(db, address, token)
-        }
+        let balance = Self::get_balance(db, address, token);
+        Self::amount_to_underlying(db, balance, token)
     }
 
     pub fn get_underlying_total_supply<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
-        if token == LEVERAGED_BASE_TOKEN {
-            let balance = Self::get_total_supply(db, token);
-            Self::amount_to_underlying(db, balance, token)
-        } else {
-            Self::get_total_supply(db, token)
-        }
+        let balance = Self::get_total_supply(db, token);
+        Self::amount_to_underlying(db, balance, token)
     }
 
-    pub fn get_underlying_price<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
-        if token == LEVERAGED_BASE_TOKEN {
-            Self::amount_to_underlying(db, BASE_FACTOR, token)
+    pub fn amount_to_underlying<B: Backend>(
+        db: &mut Db<B>,
+        amount: u64,
+        token: Address,
+    ) -> u64 {
+        if Self::get_interest_rate(db, token).is_some() {
+            let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
+            (base_token_exchange_rate * amount
+                / pow(
+                    BigUint::from(10u32),
+                    BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
+                ))
+            .to_u64()
+            .unwrap()
         } else {
-            let price = Self::get_price(db, token);
-            Self::amount_to_underlying(db, price, token)
+            amount
         }
-    }
-
-    pub fn amount_to_underlying<B: Backend>(db: &mut Db<B>, amount: u64, _token: Address) -> u64 {
-        let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
-        (base_token_exchange_rate * amount
-            / pow(
-                BigInt::from(10),
-                BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
-            ))
-        .to_u64()
-        .unwrap()
     }
 
     pub fn underlying_to_amount<B: Backend>(
@@ -85,10 +76,10 @@ impl Token {
         underlying_amount: u64,
         token: Address,
     ) -> u64 {
-        if token == LEVERAGED_BASE_TOKEN {
+        if Self::get_interest_rate(db, token).is_some() {
             let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
             (pow(
-                BigInt::from(10),
+                BigUint::from(10u32),
                 BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
             ) * underlying_amount
                 / base_token_exchange_rate)
@@ -105,11 +96,12 @@ impl Token {
         } else {
             let token_supply = AMM::get_pool_supply_of_token(db, token.clone().into());
             let base_token_supply = AMM::get_pool_supply_of_base_token(db, token.clone().into());
-            if token_supply == 0 {
+            let price = if token_supply == 0 {
                 0
             } else {
                 base_token_supply * BASE_FACTOR / token_supply
-            }
+            };
+            Self::amount_to_underlying(db, price, LEVERAGED_BASE_TOKEN)
         }
     }
 

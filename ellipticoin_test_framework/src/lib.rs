@@ -22,7 +22,7 @@ use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::pow;
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -61,7 +61,7 @@ pub fn setup<B: Backend>(db: &mut Db<B>, balances: HashMap<Address, Vec<(u64, Ad
     Token::set_base_token_exchange_rate(
         db,
         pow(
-            BigInt::from(10),
+            BigUint::from(10u32),
             BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
         ),
     );

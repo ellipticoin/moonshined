@@ -2,15 +2,20 @@ use juniper::{ParseScalarResult, ParseScalarValue, Value};
 use std::convert::TryInto;
 
 #[derive(Clone, Debug)]
-pub struct Bridge {
-    pub address: Address,
+pub struct BlockchainState {
+    pub base_token_exchange_rate: BigUint,
+    pub bridge_address: Address,
     pub signers: Vec<Bytes>,
 }
 
 #[juniper::graphql_object]
-impl Bridge {
-    fn address(&self) -> Address {
-        self.address.clone()
+impl BlockchainState {
+    fn base_token_exchange_rate(&self) -> BigUint {
+        self.base_token_exchange_rate.clone()
+    }
+
+    fn bridge_address(&self) -> Address {
+        self.bridge_address.clone()
     }
 
     fn signers(&self) -> Vec<Bytes> {
@@ -23,7 +28,6 @@ pub struct Token {
     pub address: Address,
     pub interest_rate: Option<U64>,
     pub price: U64,
-    pub underlying_price: U64,
     pub balance: U64,
     pub total_supply: U64,
 }
@@ -40,10 +44,6 @@ impl Token {
 
     fn price(&self) -> U64 {
         self.price.clone()
-    }
-
-    fn underlying_price(&self) -> U64 {
-        self.underlying_price.clone()
     }
 
     fn balance(&self) -> U64 {
@@ -316,6 +316,9 @@ impl Transaction {
 }
 
 #[derive(Clone, Debug)]
+pub struct BigUint(pub num_bigint::BigUint);
+
+#[derive(Clone, Debug)]
 pub struct U64(pub u64);
 
 impl From<U64> for String {
@@ -415,6 +418,27 @@ where
 impl From<ellipticoin_types::Address> for Address {
     fn from(bytes: ellipticoin_types::Address) -> Self {
         Self(bytes)
+    }
+}
+
+#[juniper::graphql_scalar(description = "BigUint")]
+impl<S> GraphQLScalar for BigUint
+where
+    S: ScalarValue,
+{
+    fn resolve(&self) -> Value {
+        Value::scalar(self.0.to_string())
+    }
+
+    fn from_input_value(v: &InputValue) -> Option<BigUint> {
+        v.as_scalar_value()
+            .and_then(|v| v.as_str())
+            .map(|inner| num_bigint::BigUint::parse_bytes(inner.as_bytes(), 10)).unwrap()
+            .map(BigUint)
+    }
+
+    fn from_str<'a>(value: ScalarToken<'a>) -> ParseScalarResult<'a, S> {
+        <String as ParseScalarValue<S>>::from_str(value)
     }
 }
 

@@ -12,7 +12,7 @@ use ellipticoin_contracts::{
     bridge::{Mint, Redeem, Update},
     constants::BASE_FACTOR,
 };
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
@@ -138,8 +138,8 @@ async fn get_redeems(from_block: u64, to_block: u64) -> Result<Vec<Redeem>, surf
         .collect())
 }
 
-fn scale_down(amount: BigInt, decimals: usize) -> u64 {
-    (amount / BigInt::from(pow(BigInt::from(10), decimals - *ELLIPTICOIN_DECIMALS)))
+fn scale_down(amount: BigUint, decimals: usize) -> u64 {
+    (amount / BigUint::from(pow(BigUint::from(10u32), decimals - *ELLIPTICOIN_DECIMALS)))
         .to_u64()
         .unwrap()
 }
@@ -167,7 +167,7 @@ pub async fn eth_call(
     contract_address: Address,
     selector: [u8; 4],
     block_number: u64,
-) -> Result<BigInt, surf::Error> {
+) -> Result<BigUint, surf::Error> {
     let res_hex = loop {
         let mut res = match surf::post(WEB3_URL.clone())
             .body(json!(
@@ -180,7 +180,7 @@ pub async fn eth_call(
                      "to": format!("0x{}", hex::encode(contract_address)),
                      "data": format!("0x{}", hex::encode(selector)),
                  },
-                 format!("0x{}", BigInt::from(block_number).to_str_radix(16))
+                 format!("0x{}", BigUint::from(block_number).to_str_radix(16))
              ]}
             ))
             .await
@@ -197,7 +197,7 @@ pub async fn eth_call(
         }
     };
 
-    Ok(BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16).unwrap())
+    Ok(BigUint::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16).unwrap())
 }
 
 pub async fn get_current_block() -> Result<u64, surf::Error> {
@@ -230,7 +230,7 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
     };
 
     Ok(
-        BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
+        BigUint::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
             .unwrap()
             .to_u64()
             .unwrap(),
@@ -250,8 +250,8 @@ async fn get_logs(
                 "jsonrpc": "2.0",
                 "method": "eth_getLogs",
                 "params": [{
-                    "fromBlock": format!("0x{}", BigInt::from(from_block).to_str_radix(16)),
-                    "toBlock": format!("0x{}", BigInt::from(to_block).to_str_radix(16)),
+                    "fromBlock": format!("0x{}", BigUint::from(from_block).to_str_radix(16)),
+                    "toBlock": format!("0x{}", BigUint::from(to_block).to_str_radix(16)),
                     "topics": topics.iter().map(|topic| format!("0x{}", hex::encode(topic))).collect::<Vec<String>>(),
                 }]
             }
@@ -294,10 +294,10 @@ fn parse_address(s: &str) -> Option<Address> {
     let bytes = hex::decode(s.trim_start_matches("0x")).unwrap();
     Some(Address(bytes[..][bytes.len() - 20..].try_into().unwrap()))
 }
-fn parse_big_int(s: &str) -> Option<BigInt> {
+fn parse_big_int(s: &str) -> Option<BigUint> {
     if s == "0x" {
         return None;
     }
 
-    Some(BigInt::parse_bytes(s.trim_start_matches("0x").as_bytes(), 16).unwrap())
+    Some(BigUint::parse_bytes(s.trim_start_matches("0x").as_bytes(), 16).unwrap())
 }

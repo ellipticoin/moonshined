@@ -10,7 +10,7 @@ use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -21,7 +21,7 @@ pub struct Redeem(pub u64);
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct Update {
     pub block_number: u64,
-    pub base_token_exchange_rate: BigInt,
+    pub base_token_exchange_rate: BigUint,
     pub base_token_interest_rate: u64,
     pub mints: Vec<Mint>,
     pub redeems: Vec<Redeem>,

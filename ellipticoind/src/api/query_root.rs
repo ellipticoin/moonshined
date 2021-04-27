@@ -20,9 +20,13 @@ pub struct QueryRoot;
     Context = Context,
 )]
 impl QueryRoot {
-    async fn bridge(_context: &Context) -> types::Bridge {
-        types::Bridge {
-            address: Address(BRIDGE_ADDRESS),
+    async fn blockchain_state(_context: &Context) -> types::BlockchainState {
+        let mut db = aquire_db_read_lock!();
+        let base_token_exchange_rate =
+            ellipticoin_contracts::Token::get_base_token_exchange_rate(&mut db);
+        types::BlockchainState {
+            base_token_exchange_rate: types::BigUint(base_token_exchange_rate),
+            bridge_address: Address(BRIDGE_ADDRESS),
             signers: vec![], //.iter().map(|signer| Bytes(signer)).collect()
         }
     }
@@ -48,11 +52,6 @@ impl QueryRoot {
                     &mut db,
                     token.clone().into(),
                 );
-                let underlying_price = ellipticoin_contracts::Token::get_underlying_price(
-                    &mut db,
-                    token.clone().into(),
-                );
-
                 let total_supply = ellipticoin_contracts::Token::get_underlying_total_supply(
                     &mut db,
                     token.clone().into(),
@@ -63,7 +62,6 @@ impl QueryRoot {
                     interest_rate: interest_rate.map(|interest_rate| interest_rate.into()),
                     balance: balance.into(),
                     price: price.into(),
-                    underlying_price: underlying_price.into(),
                     total_supply: total_supply.into(),
                 }
             })
