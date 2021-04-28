@@ -216,12 +216,13 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
             Ok(res) => res,
             Err(_) => continue,
         };
-        let res_hex = match res.body_json::<HashMap<String, serde_json::Value>>().await {
-            Ok(res_hashmap) => {
-                serde_json::from_value::<String>(res_hashmap.get("result").unwrap().clone())
-                    .expect("error converting to hash")
-            }
+        let res_hashmap = match res.body_json::<HashMap<String, serde_json::Value>>().await {
+            Ok(res_hashmap) => res_hashmap,
             Err(_) => continue,
+        };
+        let res_hex = match res_hashmap.get("result") {
+            Some(result) => serde_json::from_value::<String>(result.clone()).unwrap(),
+            None => continue,
         };
         if !(res_hex == "0x0") {
             break res_hex;
