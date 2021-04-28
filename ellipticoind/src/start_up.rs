@@ -35,6 +35,7 @@ pub async fn catch_up() {
         let transacations_file = File::open("var/transactions.cbor").unwrap();
         let first_block_number = db::get_block_number().await;
         let mut last_printed_block_number = 0;
+        let mut block_number = 0;
         for transaction in Deserializer::from_reader(&transacations_file)
             .into_iter::<SignedTransaction>()
             .map(Result::unwrap)
@@ -46,7 +47,7 @@ pub async fn catch_up() {
             {
                 hash_onion::peel().await;
             }
-            let block_number = db::get_block_number().await;
+            block_number = db::get_block_number().await;
             if block_number % 10000 == 0 && block_number != last_printed_block_number {
                 println!("Applied blocks #{}-#{}", block_number - 10000, block_number);
                 last_printed_block_number = block_number;
@@ -58,7 +59,7 @@ pub async fn catch_up() {
         db::verify().await;
         println!(
             "Applied {} Transactions",
-            last_printed_block_number - first_block_number
+            block_number - first_block_number
         );
     }
 }

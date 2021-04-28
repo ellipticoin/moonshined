@@ -48,10 +48,7 @@ impl QueryRoot {
                 );
                 let interest_rate =
                     ellipticoin_contracts::Token::get_interest_rate(&mut db, token.clone().into());
-                let price = ellipticoin_contracts::Token::get_price(
-                    &mut db,
-                    token.clone().into(),
-                );
+                let price = ellipticoin_contracts::Token::get_price(&mut db, token.clone().into());
                 let total_supply = ellipticoin_contracts::Token::get_underlying_total_supply(
                     &mut db,
                     token.clone().into(),
@@ -83,6 +80,8 @@ impl QueryRoot {
                 let total_supply = AMM::get_total_supply(&mut db, token.clone().into());
                 let pool_supply_of_token =
                     AMM::get_pool_supply_of_token(&mut db, token.clone().into());
+                let pool_supply_of_base_token =
+                    AMM::get_pool_supply_of_base_token(&mut db, token.clone().into());
                 let underlying_pool_supply_of_base_token =
                     AMM::get_underlying_pool_supply_of_base_token(&mut db, token.clone().into());
 
@@ -91,7 +90,8 @@ impl QueryRoot {
                     balance: U64(balance),
                     total_supply: U64(total_supply),
                     pool_supply_of_token: U64(pool_supply_of_token),
-                    pool_supply_of_base_token: U64(underlying_pool_supply_of_base_token),
+                    pool_supply_of_base_token: U64(pool_supply_of_base_token),
+                    underlying_pool_supply_of_base_token: U64(underlying_pool_supply_of_base_token),
                 }
             })
             .collect())

@@ -52,11 +52,7 @@ impl Token {
         Self::amount_to_underlying(db, balance, token)
     }
 
-    pub fn amount_to_underlying<B: Backend>(
-        db: &mut Db<B>,
-        amount: u64,
-        token: Address,
-    ) -> u64 {
+    pub fn amount_to_underlying<B: Backend>(db: &mut Db<B>, amount: u64, token: Address) -> u64 {
         if Self::get_interest_rate(db, token).is_some() {
             let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
             (base_token_exchange_rate * amount

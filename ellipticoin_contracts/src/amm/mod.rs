@@ -35,7 +35,7 @@ impl AMM {
         token: Address,
     ) -> u64 {
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
-        Token::amount_to_underlying(db, pool_supply_of_base_token, token)
+        Token::amount_to_underlying(db, pool_supply_of_base_token, LEVERAGED_BASE_TOKEN)
     }
 
     pub fn create_pool<B: Backend>(

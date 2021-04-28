@@ -258,10 +258,7 @@ async fn get_logs(
         ))
         .await {
             Ok(res) => res,
-            Err(err) =>  {
-                println!("{}", err);
-                continue
-            }
+            Err(_) => continue,
         };
         let body_json = res
             .body_json::<HashMap<String, serde_json::Value>>()
@@ -274,10 +271,7 @@ async fn get_logs(
         };
         match serde_json::from_value(result) {
             Ok(res) => break Ok(res),
-            Err(err) => {
-                println!("{}", err);
-                continue;
-            }
+            Err(_) => continue,
         }
     }
 }

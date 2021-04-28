@@ -62,6 +62,7 @@ pub struct LiquidityToken {
     pub total_supply: U64,
     pub pool_supply_of_token: U64,
     pub pool_supply_of_base_token: U64,
+    pub underlying_pool_supply_of_base_token: U64,
 }
 
 #[juniper::graphql_object]
@@ -84,6 +85,10 @@ impl LiquidityToken {
 
     fn pool_supply_of_base_token(&self) -> U64 {
         self.pool_supply_of_base_token.clone()
+    }
+
+    fn underlying_pool_supply_of_base_token(&self) -> U64 {
+        self.underlying_pool_supply_of_base_token.clone()
     }
 }
 
@@ -433,7 +438,8 @@ where
     fn from_input_value(v: &InputValue) -> Option<BigUint> {
         v.as_scalar_value()
             .and_then(|v| v.as_str())
-            .map(|inner| num_bigint::BigUint::parse_bytes(inner.as_bytes(), 10)).unwrap()
+            .map(|inner| num_bigint::BigUint::parse_bytes(inner.as_bytes(), 10))
+            .unwrap()
             .map(BigUint)
     }
 
