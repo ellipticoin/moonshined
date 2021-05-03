@@ -57,10 +57,7 @@ pub async fn catch_up() {
             db.flush();
         }
         db::verify().await;
-        println!(
-            "Applied {} Transactions",
-            block_number - first_block_number
-        );
+        println!("Applied {} Transactions", block_number - first_block_number);
     }
 }
 

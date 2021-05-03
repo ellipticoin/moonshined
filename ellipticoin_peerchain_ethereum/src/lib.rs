@@ -3,6 +3,7 @@ pub mod transaction;
 use ellipticoin_types::Address;
 pub use transaction::*;
 
+use crate::constants::SAFE_ADDRESS;
 use crate::constants::{
     BASE_TOKEN_ADDRESS, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS,
     EXCHANGE_RATE_CURRENT_SELECTOR, RECEIVED_ETH_TOPIC, REDEEM_TOPIC,
@@ -14,10 +15,41 @@ use ellipticoin_contracts::{
 };
 use num_bigint::BigUint;
 use num_traits::{pow::pow, ToPrimitive};
+use serde::{de::Deserializer, Deserialize};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
 use surf;
 pub use transaction::ecrecover;
+
+#[derive(Deserialize)]
+struct TransfersResponse {
+    result: TransfersResult,
+}
+
+#[derive(Deserialize)]
+struct TransfersResult {
+    transfers: Vec<Transfer>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct Transfer {
+    hash: String,
+    asset: String,
+    #[serde(deserialize_with = "parse_address2")]
+    from: Option<Address>,
+    raw_contract: RawContract,
+}
+
+#[derive(Deserialize, Debug)]
+struct RawContract {
+    #[serde(deserialize_with = "parse_address2")]
+    address: Option<Address>,
+    #[serde(deserialize_with = "parse_big_uint")]
+    value: BigUint,
+    #[serde(deserialize_with = "parse_usize")]
+    decimal: usize,
+}
 
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
     let current_block = get_current_block().await?;
@@ -44,77 +76,52 @@ pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
             block_number: current_block,
             base_token_interest_rate,
             base_token_exchange_rate,
-            mints: [
-                get_eth_mints(from_block, current_block).await?,
-                get_token_mints(from_block, current_block).await?,
-            ]
-            .concat(),
+            mints: vec![],//[
+                // get_mints(SAFE_ADDRESS, from_block, current_block).await?,
+                // get_mints(BRIDGE_ADDRESS, from_block, current_block).await?
+            // ].concat(),
             redeems: get_redeems(from_block, current_block).await?,
         }))
     }
 }
 
-async fn get_token_mints(from_block: u64, to_block: u64) -> Result<Vec<Mint>, surf::Error> {
-    let logs = get_logs(from_block, to_block, vec![TRANSFER_TOPIC]).await?;
-    Ok(logs
-        .iter()
-        .filter_map(|log| {
-            let topics = log.get("topics").unwrap();
-            let token_address =
-                parse_address(&value_to_string(&log.get("address").unwrap()).unwrap()).unwrap();
-            let to = match value_to_string(&topics[2])
-                .as_ref()
-                .and_then(|address| parse_address(address))
-            {
-                Some(to) => to,
-                None => return None,
-            };
-            if TOKENS.contains(&token_address) && to == BRIDGE_ADDRESS {
-                let from = parse_address(&value_to_string(&topics[1]).unwrap()).unwrap();
-                let amount = match parse_big_int(
-                    &value_to_string(&log.get("data").unwrap().clone()).unwrap(),
-                ) {
-                    Some(amount) => amount,
-                    None => return None,
-                };
-                Some(Mint(
-                    scale_down(amount, *DECIMALS.get(&token_address).unwrap()),
-                    token_address,
-                    from,
-                ))
-            } else {
-                None
-            }
-        })
-        .collect())
-}
+async fn get_mints(to_address: Address, from_block: u64, to_block: u64) -> Result<Vec<Mint>, surf::Error> {
+    let mut res = surf::post(WEB3_URL.clone())
+        .body(json!(
+         {
+         "id": 1,
+         "jsonrpc": "2.0",
+         "method": "alchemy_getAssetTransfers",
+         "params": [{
+         "fromBlock": format!("0x{}", BigUint::from(from_block).to_str_radix(16)),
+         "toBlock": format!("0x{}", BigUint::from(to_block).to_str_radix(16)),
+         "toAddress": format!("0x{}", hex::encode(to_address)),
+         "contractAddresses": TOKENS.iter().map(|token|
+                 format!("0x{}", hex::encode(&token))
+                 ).collect::<Vec<String>>()
+         }]
+         }
+        ))
+        .await
+        .unwrap();
 
-async fn get_eth_mints(from_block: u64, to_block: u64) -> Result<Vec<Mint>, surf::Error> {
-    let logs = get_logs(from_block, to_block, vec![RECEIVED_ETH_TOPIC]).await?;
-    Ok(logs
+    let mints = res
+        .body_json::<TransfersResponse>()
+        .await
+        .unwrap()
+        .result
+        .transfers
         .iter()
-        .filter_map(|log| {
-            let topics = log.get("topics").unwrap();
-            let address =
-                parse_address(&value_to_string(&log.get("address").unwrap()).unwrap()).unwrap();
-            if address == BRIDGE_ADDRESS {
-                let from = parse_address(&value_to_string(&topics[1]).unwrap()).unwrap();
-                let amount = match parse_big_int(
-                    &value_to_string(&log.get("data").unwrap().clone()).unwrap(),
-                ) {
-                    Some(amount) => amount,
-                    None => return None,
-                };
-                Some(Mint(
-                    scale_down(amount, *DECIMALS.get(&ETH_ADDRESS).unwrap()),
-                    ETH_ADDRESS,
-                    from,
-                ))
-            } else {
-                None
-            }
+        .map(|transfer: &Transfer| {
+        Mint (
+            scale_down(transfer.raw_contract.value.clone(), transfer.raw_contract.decimal),
+            transfer.raw_contract.address.unwrap_or(ETH_ADDRESS),
+            transfer.from.unwrap(),
+
+        )
         })
-        .collect())
+        .collect::<Vec<Mint>>();
+    Ok(mints)
 }
 
 async fn get_redeems(from_block: u64, to_block: u64) -> Result<Vec<Redeem>, surf::Error> {
@@ -289,6 +296,48 @@ fn parse_address(s: &str) -> Option<Address> {
     let bytes = hex::decode(s.trim_start_matches("0x")).unwrap();
     Some(Address(bytes[..][bytes.len() - 20..].try_into().unwrap()))
 }
+
+fn parse_address2<'de, D>(deserializer: D) -> Result<Option<Address>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = Value::deserialize(deserializer)?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    let s = value.as_str().unwrap();
+
+    let bytes = hex::decode(s.trim_start_matches("0x")).unwrap();
+    Ok(Some(Address(
+        bytes[..][bytes.len() - 20..].try_into().unwrap(),
+    )))
+}
+
+fn parse_big_uint<'de, D>(deserializer: D) -> Result<BigUint, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+
+    Ok(
+        BigUint::parse_bytes(s.trim_start_matches("0x").as_bytes(), 16)
+            .ok_or(serde::de::Error::custom("error parsing bytes"))?,
+    )
+}
+
+fn parse_usize<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    parse_big_uint(deserializer).map(|n| n.to_usize())?.ok_or(serde::de::Error::custom("error parsing bytes"))
+    // let s = String::deserialize(deserializer)?;
+    //
+    // Ok(
+    //     BigUint::parse_bytes(s.trim_start_matches("0x").as_bytes(), 16)
+    //         .ok_or(serde::de::Error::custom("error parsing bytes"))?,
+    // )
+}
+
 fn parse_big_int(s: &str) -> Option<BigUint> {
     if s == "0x" {
         return None;
