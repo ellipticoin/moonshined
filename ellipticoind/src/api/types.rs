@@ -28,6 +28,7 @@ pub struct Token {
     pub address: Address,
     pub interest_rate: Option<U64>,
     pub price: U64,
+    pub underlying_exchange_rate: U64,
     pub balance: U64,
     pub total_supply: U64,
 }
@@ -44,6 +45,10 @@ impl Token {
 
     fn price(&self) -> U64 {
         self.price.clone()
+    }
+
+    fn underlying_exchange_rate(&self) -> U64 {
+        self.underlying_exchange_rate.clone()
     }
 
     fn balance(&self) -> U64 {
