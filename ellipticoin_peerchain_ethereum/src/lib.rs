@@ -266,7 +266,8 @@ async fn get_logs(
         let result = match body_json.get("result") {
             Some(res) => res.clone(),
             None => {
-                panic!("{:?}", body_json)
+                print!("{:?}", body_json);
+                continue
             }
         };
         match serde_json::from_value(result) {
