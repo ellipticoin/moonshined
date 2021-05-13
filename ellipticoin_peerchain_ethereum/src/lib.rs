@@ -320,7 +320,7 @@ async fn get_logs(
             Some(res) => res.clone(),
             None => {
                 print!("{:?}", body_json);
-                continue
+                continue;
             }
         };
         match serde_json::from_value(result) {

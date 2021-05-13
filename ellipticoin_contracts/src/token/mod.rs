@@ -38,10 +38,7 @@ impl Token {
         }
     }
 
-    pub fn get_underlying_exchange_rate<B: Backend>(
-        db: &mut Db<B>,
-        token: Address,
-    ) -> u64 {
+    pub fn get_underlying_exchange_rate<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
         Self::underlying_to_amount(db, BASE_FACTOR, token)
     }
 

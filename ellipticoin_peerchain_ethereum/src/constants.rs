@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use std::env;
 
 lazy_static! {
-    pub static ref ELLIPTICOIN_DECIMALS: usize = BASE_FACTOR.to_string().len();
+    pub static ref ELLIPTICOIN_DECIMALS: usize = BASE_FACTOR.to_string().len() - 1;
     pub static ref WEB3_URL: String = env::var("WEB3_URL").expect("WEB3_URL not set");
 }
 
