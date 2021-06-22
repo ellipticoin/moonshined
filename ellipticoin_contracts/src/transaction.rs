@@ -73,7 +73,7 @@ impl Action {
             }
             Action::CreateRedeemRequest(underlying_amount, token) => {
                 let amount = Token::underlying_to_amount(db, *underlying_amount, *token);
-                Bridge::create_redeem_request(db, sender, *amount, *token)
+                Bridge::create_redeem_request(db, sender, amount, *token)
             }
             Action::FillOrder(order_id, _order_type, _amount, _token, _price) => {
                 OrderBook::fill(db, sender, *order_id)
