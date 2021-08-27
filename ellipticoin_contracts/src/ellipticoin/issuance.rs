@@ -6,11 +6,16 @@ lazy_static! {
     pub static ref INCENTIVISED_POOLS: Vec<Address> = vec![BTC.clone(), ETH.clone()];
 }
 
+const MIGRATION_TO_POLYGON_AT: u64 = 6_359_375;
 const BLOCKS_PER_ERA: u64 = 8_000_000;
 const NUMBER_OF_ERAS: u64 = 8;
 
 impl Ellipticoin {
     pub fn block_reward_at(block: u64) -> u64 {
+        if block > MIGRATION_TO_POLYGON_AT {
+          return 0
+        }
+
         if block > BLOCKS_PER_ERA * NUMBER_OF_ERAS {
             return 0;
         }
@@ -28,6 +33,13 @@ mod tests {
     const SECONDS_IN_A_YEAR: u64 = 31556952;
 
     #[test]
+    fn test_migration_to_polygon() {
+        assert_eq!(Ellipticoin::block_reward_at(MIGRATION_TO_POLYGON_AT), 1280000);
+        assert_eq!(Ellipticoin::block_reward_at(MIGRATION_TO_POLYGON_AT + 1), 0);
+    }
+
+    #[test]
+    #[ignore]
     fn test_total_supply() {
         let mut total_issuance = 0;
         let mut total_time: Duration = Default::default();
