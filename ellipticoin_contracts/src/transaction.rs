@@ -84,6 +84,7 @@ impl Action {
             }
             Action::Pay(recipient, underlying_amount, token) => {
                 let amount = Token::underlying_to_amount(db, *underlying_amount, *token);
+                println!("Paying {} {} to {}", amount, hex::encode(&token), hex::encode(&recipient));
                 Token::transfer(db, sender, *recipient, amount, *token)
             }
             Action::RemoveLiquidity(percentage, token) => {
