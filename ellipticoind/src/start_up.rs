@@ -1,17 +1,13 @@
 use crate::{
-    config::{self, address, SIGNER},
-    db,
-    transaction::{new_start_mining_transaction, run},
+    aquire_db_write_lock,
+    config::{self, address, OPTS, SIGNER},
+    constants::DB,
+    db, hash_onion,
+    serde_cbor::Deserializer,
+    transaction::{new_start_mining_transaction, run, SignedTransaction},
 };
-
-use crate::{
-    aquire_db_write_lock, config::OPTS, constants::DB, hash_onion, serde_cbor::Deserializer,
-    transaction::SignedTransaction,
-};
-
 use ellipticoin_contracts::Miner;
-use ellipticoin_peerchain_ethereum::eth_address;
-use ellipticoin_types::traits::Run;
+use ellipticoin_peerchain_ethereum::signature::eth_address;
 use std::{fs::File, path::Path};
 
 pub async fn start_miner() {
@@ -24,7 +20,7 @@ pub async fn start_miner() {
         run(start_mining_transaction).await.unwrap();
         println!(
             "Started Miner: {}",
-            hex::encode(eth_address(SIGNER.verify_key()))
+            hex::encode(eth_address(&SIGNER.verifying_key()))
         );
     }
 }

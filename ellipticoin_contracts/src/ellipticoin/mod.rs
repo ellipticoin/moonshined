@@ -92,7 +92,7 @@ impl Ellipticoin {
         Self::settle_block_rewards(db)?;
         Self::shuffle_miners(db, &mut miners, hash_onion_skin);
         Self::issue_block_rewards(db)?;
-        System::increment_block_number(db);
+        System::seal_block(db);
 
         Ok(())
     }

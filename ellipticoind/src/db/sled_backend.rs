@@ -1,8 +1,7 @@
 use indicatif::ProgressBar;
 use serde_cbor::Deserializer;
 use sled::Batch;
-use std::io::Write;
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, fs::File, io::Write};
 
 #[derive(Debug)]
 pub struct SledBackend {

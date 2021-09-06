@@ -1,5 +1,5 @@
 use crate::{
-    constants::{BASE_FACTOR, MS},
+    constants::{BASE_FACTOR, MSX},
     governance::Proposal,
     Governance, Token,
 };
@@ -10,7 +10,7 @@ const MINIMUM_PROPOSAL_THRESHOLD: u64 = 50000;
 
 impl Governance {
     pub fn validate_balance<B: Backend>(db: &mut Db<B>, sender: Address) -> Result<()> {
-        let balance = Token::get_balance(db, sender, MS);
+        let balance = Token::get_balance(db, sender, MSX);
         if balance > 0 {
             Ok(())
         } else {
@@ -30,8 +30,8 @@ impl Governance {
         db: &mut Db<B>,
         sender: Address,
     ) -> Result<()> {
-        let balance = Token::get_balance(db, sender, MS);
-        let total_supply = Token::get_total_supply(db, MS);
+        let balance = Token::get_balance(db, sender, MSX);
+        let total_supply = Token::get_total_supply(db, MSX);
         if balance > total_supply * MINIMUM_PROPOSAL_THRESHOLD / BASE_FACTOR {
             Ok(())
         } else {

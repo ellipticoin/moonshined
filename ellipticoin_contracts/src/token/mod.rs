@@ -1,7 +1,7 @@
 pub mod macros;
 
 use crate::{
-    constants::{BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA, LEVERAGED_BASE_TOKEN},
+    constants::{BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA, USD},
     contract::{self, Contract},
     AMM,
 };
@@ -24,20 +24,11 @@ impl Contract for Token {
 
 db_accessors!(Token {
     balance(address: Address, token: Address) -> u64;
-    base_token_interest_rate() -> u64;
-    base_token_exchange_rate() -> BigUint;
+    usd_exchange_rate() -> BigUint;
     total_supply(token: Address) -> u64;
 });
 
 impl Token {
-    pub fn get_interest_rate<B: Backend>(db: &mut Db<B>, token: Address) -> Option<u64> {
-        if [LEVERAGED_BASE_TOKEN].contains(&token) {
-            Some(Token::get_base_token_interest_rate(db))
-        } else {
-            None
-        }
-    }
-
     pub fn get_underlying_exchange_rate<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
         Self::underlying_to_amount(db, BASE_FACTOR, token)
     }
@@ -57,9 +48,9 @@ impl Token {
     }
 
     pub fn amount_to_underlying<B: Backend>(db: &mut Db<B>, amount: u64, token: Address) -> u64 {
-        if Self::get_interest_rate(db, token).is_some() {
-            let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
-            (base_token_exchange_rate * amount
+        if token == USD {
+            let usd_exchange_rate = Token::get_usd_exchange_rate(db);
+            (usd_exchange_rate * amount
                 / pow(
                     BigUint::from(10u32),
                     BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
@@ -76,13 +67,13 @@ impl Token {
         underlying_amount: u64,
         token: Address,
     ) -> u64 {
-        if Self::get_interest_rate(db, token).is_some() {
-            let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
+        if token == USD {
+            let usd_exchange_rate = Token::get_usd_exchange_rate(db);
             (pow(
                 BigUint::from(10u32),
                 BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
             ) * underlying_amount
-                / base_token_exchange_rate)
+                / usd_exchange_rate)
                 .to_u64()
                 .unwrap()
         } else {
@@ -91,17 +82,17 @@ impl Token {
     }
 
     pub fn get_price<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
-        if token == LEVERAGED_BASE_TOKEN {
+        if token == USD {
             BASE_FACTOR
         } else {
             let token_supply = AMM::get_pool_supply_of_token(db, token.clone().into());
-            let base_token_supply = AMM::get_pool_supply_of_base_token(db, token.clone().into());
+            let usd_supply = AMM::get_pool_supply_of_usd(db, token.clone().into());
             let price = if token_supply == 0 {
                 0
             } else {
-                base_token_supply * BASE_FACTOR / token_supply
+                usd_supply * BASE_FACTOR / token_supply
             };
-            Self::amount_to_underlying(db, price, LEVERAGED_BASE_TOKEN)
+            Self::amount_to_underlying(db, price, USD)
         }
     }
 

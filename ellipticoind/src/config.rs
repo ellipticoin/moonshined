@@ -1,6 +1,6 @@
 use clap::Clap;
 use dotenv::dotenv;
-use ellipticoin_peerchain_ethereum::eth_address;
+use ellipticoin_peerchain_ethereum::signature::eth_address;
 use ellipticoin_types::Address;
 use k256::ecdsa::SigningKey;
 use serde::{Deserialize, Deserializer};
@@ -16,8 +16,8 @@ pub struct Opts {
     pub bind_address: String,
     #[clap(short = 'd', long = "database-url")]
     pub database_url: Option<String>,
-    #[clap(short = 'n', long = "network-id", default_value = "3750925312")]
-    pub network_id: u32,
+    #[clap(short = 'c', long = "chain-id", default_value = "24")]
+    pub chain_id: u64,
     #[clap(short = 'p', long = "port", default_value = "80")]
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./ellipticoind/db")]
@@ -103,19 +103,11 @@ pub fn socket() -> SocketAddr {
 }
 
 pub fn address() -> Address {
-    eth_address(SIGNER.verify_key())
+    eth_address(&SIGNER.verifying_key())
 }
 pub fn verification_key() -> Address {
     Address([0; 20])
     // VerificationKey::from(&signing_key()).into()
-}
-
-pub fn network_id() -> u32 {
-    if cfg!(test) {
-        0
-    } else {
-        OPTS.network_id
-    }
 }
 
 pub fn host_uri(host: &str) -> String {

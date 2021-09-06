@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use ellipticoin_contracts::{
-    bridge, governance, order_book, Bridge, Ellipticoin, Governance, OrderBook, System, AMM,
+    governance, order_book, Ellipticoin, Governance, OrderBook, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
 
@@ -22,10 +22,9 @@ pub struct QueryRoot;
 impl QueryRoot {
     async fn blockchain_state(_context: &Context) -> types::BlockchainState {
         let mut db = aquire_db_read_lock!();
-        let base_token_exchange_rate =
-            ellipticoin_contracts::Token::get_base_token_exchange_rate(&mut db);
+        let usd_exchange_rate = ellipticoin_contracts::Token::get_usd_exchange_rate(&mut db);
         types::BlockchainState {
-            base_token_exchange_rate: types::BigUint(base_token_exchange_rate),
+            usd_exchange_rate: types::BigUint(usd_exchange_rate),
             bridge_address: Address(BRIDGE_ADDRESS),
             signers: vec![], //.iter().map(|signer| Bytes(signer)).collect()
         }
@@ -46,8 +45,6 @@ impl QueryRoot {
                     address.clone().into(),
                     token.clone().into(),
                 );
-                let interest_rate =
-                    ellipticoin_contracts::Token::get_interest_rate(&mut db, token.clone().into());
                 let price = ellipticoin_contracts::Token::get_price(&mut db, token.clone().into());
                 let underlying_exchange_rate =
                     ellipticoin_contracts::Token::get_underlying_exchange_rate(
@@ -61,7 +58,6 @@ impl QueryRoot {
 
                 Token {
                     address: token,
-                    interest_rate: interest_rate.map(|interest_rate| interest_rate.into()),
                     balance: balance.into(),
                     price: price.into(),
                     underlying_exchange_rate: underlying_exchange_rate.into(),
@@ -86,18 +82,17 @@ impl QueryRoot {
                 let total_supply = AMM::get_total_supply(&mut db, token.clone().into());
                 let pool_supply_of_token =
                     AMM::get_pool_supply_of_token(&mut db, token.clone().into());
-                let pool_supply_of_base_token =
-                    AMM::get_pool_supply_of_base_token(&mut db, token.clone().into());
-                let underlying_pool_supply_of_base_token =
-                    AMM::get_underlying_pool_supply_of_base_token(&mut db, token.clone().into());
+                let pool_supply_of_usd = AMM::get_pool_supply_of_usd(&mut db, token.clone().into());
+                let underlying_pool_supply_of_usd =
+                    AMM::get_underlying_pool_supply_of_usd(&mut db, token.clone().into());
 
                 LiquidityToken {
                     token_address: token,
                     balance: U64(balance),
                     total_supply: U64(total_supply),
                     pool_supply_of_token: U64(pool_supply_of_token),
-                    pool_supply_of_base_token: U64(pool_supply_of_base_token),
-                    underlying_pool_supply_of_base_token: U64(underlying_pool_supply_of_base_token),
+                    pool_supply_of_usd: U64(pool_supply_of_usd),
+                    underlying_pool_supply_of_usd: U64(underlying_pool_supply_of_usd),
                 }
             })
             .collect())
@@ -174,38 +169,6 @@ impl QueryRoot {
             ),
         );
         Ok(U64(issuance_rewards))
-    }
-
-    async fn pending_redeem_requests(
-        _context: &Context,
-        address: Bytes,
-    ) -> Result<Vec<RedeemRequest>, FieldError> {
-        let address = ellipticoin_types::Address(
-            <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?,
-        );
-        let mut db = aquire_db_read_lock!();
-        let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
-        Ok(pending_redeem_requests
-            .iter()
-            .filter(|bridge::RedeemRequest { sender, .. }| *sender == address)
-            .map(
-                |bridge::RedeemRequest {
-                     id,
-                     sender,
-                     token,
-                     amount,
-                     expiration_block_number,
-                     signature,
-                 }| RedeemRequest {
-                    id: (*id).into(),
-                    sender: (*sender).into(),
-                    token: (*token).into(),
-                    amount: (*amount).into(),
-                    expiration_block_number: (*expiration_block_number).unwrap().into(),
-                    signature: signature.as_ref().unwrap().to_vec().into(),
-                },
-            )
-            .collect())
     }
 
     async fn next_transaction_number(

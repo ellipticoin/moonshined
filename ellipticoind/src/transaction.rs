@@ -1,122 +1,141 @@
 use crate::{
     aquire_db_read_lock, aquire_db_write_lock,
-    config::{verification_key, HOST},
-    constants::{DB, NETWORK_ID, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
-    crypto::{sign, sign_eth},
+    config::{verification_key, HOST, OPTS},
+    constants::{DB, GAS_LIMIT, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
     hash_onion,
 };
 use anyhow::Result;
-use ellipticoin_contracts::bridge::Update;
-use ellipticoin_contracts::{Action, Bridge, System, Transaction};
-use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
-use ellipticoin_peerchain_ethereum::ecrecover;
-use ellipticoin_types::Address;
+use ellipticoin_contracts::{
+    contract::Contract, Action, Bridge, Ellipticoin, System, Transaction, AMM,
+};
+use ellipticoin_peerchain_ethereum::{abi::encode_action, crypto, rlp, signature::Signature};
+
+use ellipticoin_peerchain_polygon::process_withdrawl;
 use ellipticoin_types::{
     db::{Backend, Db},
     traits::Run,
+    Address,
 };
+use num_bigint::BigUint;
+use num_traits::{pow, FromPrimitive};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum SignedTransaction {
-    Ethereum(ellipticoin_peerchain_ethereum::SignedTransaction),
-    System(SignedSystemTransaction),
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SignedTransaction(pub Transaction, pub Signature);
+
+pub async fn sign(action: Action) -> SignedTransaction {
+    let mut db = aquire_db_read_lock!();
+    let mut transaction: SignedTransaction = SignedTransaction(
+        Transaction {
+            transaction_number: System::get_next_transaction_number(&mut db, verification_key()),
+            action,
+        },
+        Default::default(),
+    );
+    transaction.sign();
+    transaction
 }
 
 impl SignedTransaction {
-    fn is_redeem_request(&self) -> bool {
-        if let SignedTransaction::Ethereum(transaction) = self {
-            matches!(transaction.0.action, Action::CreateRedeemRequest(_, _))
-        } else {
-            false
+    fn sign(&mut self) {
+        self.1 = crypto::sign(&self.signing_data())
+    }
+
+    fn signing_data(&self) -> Vec<u8> {
+        rlp::encode(vec![
+            BigUint::from_u64(self.0.transaction_number)
+                .unwrap()
+                .to_bytes_be()
+                .to_vec(),
+            vec![],
+            BigUint::from_u64(GAS_LIMIT).unwrap().to_bytes_be().to_vec(),
+            self.to().unwrap().0.to_vec(),
+            self.value(),
+            self.data(),
+            BigUint::from_u64(OPTS.chain_id)
+                .unwrap()
+                .to_bytes_be()
+                .to_vec(),
+            vec![],
+            vec![],
+        ])
+    }
+
+    fn to(&self) -> Option<Address> {
+        Some(match &self.0.action {
+            Action::Pay(recipient, _amount, _token) => *recipient,
+            Action::CreatePool(..) => AMM::address(),
+            Action::AddLiquidity(..) => AMM::address(),
+            Action::Buy(..) => AMM::address(),
+            Action::RemoveLiquidity(..) => AMM::address(),
+            Action::CreateWithdrawlRequest(..) => Bridge::address(),
+            Action::Seal(..) => Ellipticoin::address(),
+            Action::Sell(..) => AMM::address(),
+            Action::StartMining(..) => Ellipticoin::address(),
+            Action::ProcessEthereumMessages(..) => Bridge::address(),
+            Action::ProcessPolygonMessages(..) => Bridge::address(),
+            Action::Null => return None, // action => return Err(anyhow!("{:?} invalid action", action.clone())),
+        })
+    }
+
+    fn data(&self) -> Vec<u8> {
+        encode_action(&self.0.action)
+    }
+
+    fn value(&self) -> Vec<u8> {
+        match &self.0.action {
+            Action::Pay(_recipient, amount, _token) => {
+                (BigUint::from(amount) * BigUint::from(pow(BigUint::from(10u32), 12))).to_bytes_be()
+            }
+            _ => vec![],
         }
+    }
+
+    pub fn sender(&self) -> anyhow::Result<Address> {
+        Ok(self.recover_address().unwrap())
+    }
+
+    pub fn run<B: Backend>(&self, db: &mut Db<B>) -> anyhow::Result<u64> {
+        self.0.run(db, self.sender()?)
+    }
+}
+
+impl SignedTransaction {
+    fn is_withdrawl(&self) -> bool {
+        matches!(self.0.action, Action::CreateWithdrawlRequest(_, _))
     }
 
     pub fn is_seal(&self) -> bool {
-        if let SignedTransaction::System(transaction) = self {
-            matches!(transaction.0.action, Action::Seal(_))
-        } else {
-            false
-        }
+        matches!(self.0.action, Action::Seal(_))
+    }
+
+    pub fn recover_address(&self) -> Result<Address> {
+        self.1.recover_address(&self.signing_data())
     }
 }
+
 impl Run for SignedTransaction {
     fn sender(&self) -> Result<Address> {
-        match self {
-            SignedTransaction::Ethereum(transaction) => transaction.sender(),
-            SignedTransaction::System(transaction) => transaction.sender(),
-        }
+        self.sender()
     }
 
-    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
-        match self {
-            SignedTransaction::Ethereum(transaction) => transaction.run(db),
-            SignedTransaction::System(transaction) => transaction.run(db),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignedSystemTransaction(pub Transaction, Vec<u8>);
-
-impl Run for SignedSystemTransaction {
-    fn sender(&self) -> Result<Address> {
-        ecrecover(serde_cbor::to_vec(&self.0)?, &self.1)
-    }
-
-    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
+    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<u64> {
         self.0.action.run(db, self.sender()?)
     }
 }
 
-pub trait IsRedeemRequest {
-    fn is_redeem_request(&self) -> bool;
-}
-
-impl IsRedeemRequest for ellipticoin_peerchain_ethereum::SignedTransaction {
-    fn is_redeem_request(&self) -> bool {
-        matches!(self.0.action, Action::CreateRedeemRequest(_, _))
-    }
-}
-
-impl IsRedeemRequest for SignedSystemTransaction {
-    fn is_redeem_request(&self) -> bool {
-        false
-    }
-}
-
-impl SignedSystemTransaction {
-    pub fn new<B: Backend>(db: &mut Db<B>, action: Action) -> SignedSystemTransaction {
-        let transaction = Transaction {
-            network_id: NETWORK_ID,
-            transaction_number: System::get_next_transaction_number(db, verification_key()),
-            action,
-        };
-        let signature = sign(&transaction);
-        SignedSystemTransaction(transaction, signature.to_vec())
-    }
-
-    pub async fn apply<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
-        let result = self.0.action.run(db, self.sender()?);
-        if result.is_ok() {
-            db.commit();
-        } else {
-            db.revert();
-        }
-        result
-    }
-}
-
-pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
+pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<u64, anyhow::Error> {
     let receiver = TRANSACTION_QUEUE.push(signed_transaction).await;
     receiver.await.unwrap()
 }
 
-pub async fn run(transaction: SignedTransaction) -> Result<()> {
+pub async fn run(transaction: SignedTransaction) -> Result<u64> {
     let mut db = aquire_db_write_lock!();
     let result = transaction.run(&mut db);
-    if transaction.is_redeem_request() && result.is_ok() {
-        sign_last_redeem_request(&mut db).await.unwrap();
+    if transaction.is_withdrawl() && result.is_ok() {
+        let pending_withdrawls = Bridge::get_pending_withdrawls(&mut db);
+        process_withdrawl(pending_withdrawls.last().unwrap()).await;
     }
     if result.is_ok() {
         db.commit();
@@ -137,73 +156,25 @@ pub async fn apply(transaction: &SignedTransaction) -> Result<()> {
         transaction_state: Default::default(),
     };
     let result = transaction.run(&mut db);
-    if transaction.is_redeem_request() && result.is_ok() {
-        sign_last_redeem_request(&mut db).await.unwrap();
-    }
     if result.is_ok() {
         db.commit();
     } else {
         db.revert();
     }
 
-    result
-}
-
-pub async fn sign_last_redeem_request<B: Backend>(db: &mut Db<B>) -> Result<()> {
-    let pending_redeem_request = Bridge::get_pending_redeem_requests(db)
-        .last()
-        .unwrap()
-        .clone();
-    let ethereum_block_number = Bridge::get_ethereum_block_number(db);
-    let experation_block_number = ethereum_block_number + REDEEM_TIMEOUT;
-    let signature = sign_eth(&(
-        serde_eth::Address(pending_redeem_request.sender.0),
-        pending_redeem_request.amount,
-        serde_eth::Address(pending_redeem_request.token.0),
-        experation_block_number,
-        pending_redeem_request.id,
-        serde_eth::Address(BRIDGE_ADDRESS.0),
-    ));
-
-    let redeem_transaction = SignedSystemTransaction::new(
-        db,
-        Action::SignRedeemRequest(
-            pending_redeem_request.id,
-            experation_block_number,
-            signature.to_vec(),
-        ),
-    );
-    redeem_transaction.run(db)
+    drop(result);
+    Ok(())
 }
 
 pub async fn new_start_mining_transaction() -> SignedTransaction {
-    let mut db = aquire_db_read_lock!();
-    SignedTransaction::System(SignedSystemTransaction::new(
-        &mut db,
-        Action::StartMining(
-            HOST.to_string(),
-            hash_onion::peel().await,
-            hash_onion::layers_left().await as u64,
-        ),
+    sign(Action::StartMining(
+        HOST.to_string(),
+        hash_onion::peel().await,
+        hash_onion::layers_left().await.try_into().unwrap(),
     ))
+    .await
 }
 
 pub async fn new_seal_transaction() -> SignedTransaction {
-    let mut db = aquire_db_read_lock!();
-    let seal_transaction =
-        SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));
-    SignedTransaction::System(seal_transaction)
-}
-
-pub async fn new_start_bridge_transaction(ethereum_block_number: u64) -> SignedTransaction {
-    let mut db = aquire_db_read_lock!();
-    let start_bridge_transaction =
-        SignedSystemTransaction::new(&mut db, Action::StartBridge(ethereum_block_number));
-    SignedTransaction::System(start_bridge_transaction)
-}
-
-pub async fn new_update_transaction(update: Update) -> SignedTransaction {
-    let mut db = aquire_db_read_lock!();
-    let update_transaction = SignedSystemTransaction::new(&mut db, Action::Update(update));
-    SignedTransaction::System(update_transaction)
+    sign(Action::Seal(hash_onion::peel().await)).await
 }

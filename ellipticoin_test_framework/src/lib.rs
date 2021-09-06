@@ -58,7 +58,7 @@ pub fn new_db() -> Db<TestBackend> {
     }
 }
 pub fn setup<B: Backend>(db: &mut Db<B>, balances: HashMap<Address, Vec<(u64, Address)>>) {
-    Token::set_base_token_exchange_rate(
+    Token::set_usd_exchange_rate(
         db,
         pow(
             BigUint::from(10u32),

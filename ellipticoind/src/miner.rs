@@ -2,7 +2,6 @@ use crate::{
     constants::{BLOCK_TIME, TRANSACTION_QUEUE, WEB_SOCKET_BROADCASTER},
     db,
     helpers::run_for,
-    peerchains,
     transaction::{self, new_seal_transaction},
 };
 
@@ -20,7 +19,6 @@ async fn mine_block() {
         }
     })
     .await;
-    peerchains::poll().await;
     transaction::run(new_seal_transaction().await)
         .await
         .unwrap();

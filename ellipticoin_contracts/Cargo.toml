@@ -17,11 +17,12 @@ ellipticoin_types = {path = "../ellipticoin_types"}
 hex = "*"
 hex-literal = "0.3.0"
 lazy_static = "*"
-num-traits = "*"
-num-bigint = { version = "*", features = ["serde"] }
+num-traits = "0.2.14"
+num-bigint = { version = "0.4.2", features = ["serde"] }
 rand = {version = "0.8.3", features = ["small_rng"]}
 serde = { version = "1.0.120", features = ["derive"] }
 serde_cbor = "0.11.1"
+serde_eth = "0.1.1"
 sha2 = "0.9.1"
 
 [dev-dependencies]
