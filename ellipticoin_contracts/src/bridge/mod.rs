@@ -1,7 +1,6 @@
 use crate::{
     charge,
     contract::{self, Contract},
-    pay,
     token::Token,
 };
 use anyhow::{anyhow, Result};
@@ -12,29 +11,33 @@ use ellipticoin_types::{
 };
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Mint(pub u64, pub Address, pub Address);
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Redeem(pub u64);
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
-pub struct Update {
-    pub block_number: u64,
-    pub base_token_exchange_rate: BigUint,
-    pub base_token_interest_rate: u64,
-    pub mints: Vec<Mint>,
-    pub redeems: Vec<Redeem>,
+pub enum PolygonMessage {
+    Deposit(u64, Address, Address),
+    ProcessWithdrawl(u64, [u8; 32]),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct RedeemRequest {
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum EthereumMessage {
+    SetUSDExchangeRate(BigUint),
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct PendingWithdrawl {
     pub id: u64,
-    pub sender: Address,
+    pub to: Address,
     pub token: Address,
     pub amount: u64,
-    pub expiration_block_number: Option<u64>,
-    pub signature: Option<Vec<u8>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct CompletedWithdrawl {
+    pub to: Address,
+    pub token: Address,
+    pub amount: u64,
+    pub transaction_hash: [u8; 32],
 }
 
 pub struct Bridge;
@@ -45,142 +48,95 @@ impl Contract for Bridge {
 
 db_accessors!(Bridge {
     ethereum_block_number() -> u64;
-    pending_redeem_requests() -> Vec<RedeemRequest>;
-    redeem_id_counter() -> u64;
-    signature(transaction_id: u64) -> Vec<u8>;
+    polygon_block_number() -> u64;
+    withdrawl_id_counter() -> u64;
+    pending_withdrawls() -> Vec<PendingWithdrawl>;
+    completed_withdrawl(withdrawl_id: u64) -> CompletedWithdrawl;
 });
 
 impl Bridge {
-    pub fn start<B: Backend>(db: &mut Db<B>, ethereum_block_number: u64) -> Result<()> {
-        Bridge::set_ethereum_block_number(db, ethereum_block_number);
-        Ok(())
-    }
-    pub fn update<B: Backend>(db: &mut Db<B>, update: Update) -> Result<()> {
-        match update {
-            Update {
-                block_number,
-                base_token_exchange_rate,
-                base_token_interest_rate,
-                mints,
-                redeems,
-            } => {
-                Token::set_base_token_exchange_rate(db, base_token_exchange_rate);
-                Token::set_base_token_interest_rate(db, base_token_interest_rate);
-                let pending_redeem_requests = Bridge::get_pending_redeem_requests(db);
-                for pending_redeem_request in pending_redeem_requests.iter() {
-                    if block_number > pending_redeem_request.expiration_block_number.unwrap() {
-                        Bridge::cancel_redeem_request(db, pending_redeem_request.id).unwrap();
-                    }
+    pub fn process_polygon_messages<B: Backend>(
+        db: &mut Db<B>,
+        messages: Vec<PolygonMessage>,
+        block_number: u64,
+    ) -> Result<()> {
+        for message in messages {
+            match message {
+                PolygonMessage::Deposit(amount, token, address) => {
+                    Token::mint(db, amount, token, address)
                 }
-                for Mint(amount, token, address) in mints.iter() {
-                    Bridge::mint(db, *amount, *token, *address).unwrap();
+                PolygonMessage::ProcessWithdrawl(withdrawl_id, transaction_hash) => {
+                    let mut pending_withdrawls = Self::get_pending_withdrawls(db);
+                    let index = pending_withdrawls
+                        .iter()
+                        .cloned()
+                        .position(|pending_withdrawl| pending_withdrawl.id == withdrawl_id)
+                        .ok_or(anyhow!("Withdrawl request {} not found", withdrawl_id))?;
+                    Self::set_completed_withdrawl(
+                        db,
+                        withdrawl_id,
+                        CompletedWithdrawl {
+                            amount: pending_withdrawls[index].amount,
+                            to: pending_withdrawls[index].to,
+                            token: pending_withdrawls[index].token,
+                            transaction_hash,
+                        },
+                    );
+                    pending_withdrawls.remove(index);
+                    Self::set_pending_withdrawls(db, pending_withdrawls);
                 }
-                for Redeem(redeem_id) in redeems.iter() {
-                    Bridge::redeem(db, *redeem_id).unwrap();
-                }
-                Bridge::set_ethereum_block_number(db, block_number);
-                Ok(())
             }
         }
-    }
-
-    pub fn mint<B: Backend>(
-        db: &mut Db<B>,
-        amount: u64,
-        token: Address,
-        address: Address,
-    ) -> Result<()> {
-        Token::mint(db, amount, token, address);
+        Self::set_polygon_block_number(db, block_number);
         Ok(())
     }
 
-    pub fn create_redeem_request<B: Backend>(
+    pub fn process_ethereum_messages<B: Backend>(
         db: &mut Db<B>,
-        sender: Address,
+        messages: Vec<EthereumMessage>,
+        block_number: u64,
+    ) -> Result<()> {
+        for message in messages {
+            match message {
+                EthereumMessage::SetUSDExchangeRate(usd_exchange_rate) => {
+                    Token::set_usd_exchange_rate(db, usd_exchange_rate)
+                }
+            }
+        }
+        Self::set_ethereum_block_number(db, block_number.try_into().unwrap());
+        Ok(())
+    }
+
+    pub fn create_withdrawl_request<B: Backend>(
+        db: &mut Db<B>,
+        to: Address,
         amount: u64,
         token: Address,
     ) -> Result<()> {
-        charge!(db, sender, token, amount)?;
-        let mut pending_redeem_requests = Self::get_pending_redeem_requests(db);
-        pending_redeem_requests.push(RedeemRequest {
-            id: Self::get_redeem_id_counter(db),
-            sender,
+        charge!(db, to, token, amount)?;
+        let mut pending_withdrawls = Self::get_pending_withdrawls(db);
+        pending_withdrawls.push(PendingWithdrawl {
+            id: Self::get_withdrawl_id_counter(db),
+            to,
             amount,
             token,
-            expiration_block_number: None,
-            signature: None,
         });
-        Self::increment_redeem_id_counter(db);
-        Self::set_pending_redeem_requests(db, pending_redeem_requests);
+        Self::increment_withdrawl_id_counter(db);
+        Self::set_pending_withdrawls(db, pending_withdrawls);
+
         Ok(())
     }
 
-    pub fn sign_redeem_request<B: Backend>(
-        db: &mut Db<B>,
-        redeem_id: u64,
-        expiration_block_number: u64,
-        signature: Vec<u8>,
-    ) -> Result<()> {
-        let mut pending_redeem_requests = Self::get_pending_redeem_requests(db);
-        let index = pending_redeem_requests
-            .iter()
-            .cloned()
-            .position(|pending_redeem_request| pending_redeem_request.id == redeem_id)
-            .ok_or(anyhow!("Redeem request {} not found", redeem_id))?;
-        pending_redeem_requests[index].expiration_block_number = Some(expiration_block_number);
-        pending_redeem_requests[index].signature = Some(signature);
-        Self::set_pending_redeem_requests(db, pending_redeem_requests);
-        Ok(())
-    }
-
-    pub fn cancel_redeem_request<B: Backend>(db: &mut Db<B>, redeem_id: u64) -> Result<()> {
-        let pending_redeem_request = Self::remove_redeem_request(db, redeem_id)?;
-        pay!(
-            db,
-            pending_redeem_request.sender,
-            pending_redeem_request.token,
-            pending_redeem_request.amount
-        )?;
-        Ok(())
-    }
-
-    pub fn redeem<B: Backend>(db: &mut Db<B>, redeem_id: u64) -> Result<()> {
-        let pending_redeem_request = Self::remove_redeem_request(db, redeem_id)?;
-        Token::burn(
-            db,
-            pending_redeem_request.amount,
-            pending_redeem_request.token,
-            Self::address(),
-        )?;
-        Ok(())
-    }
-
-    fn increment_redeem_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
-        let redeem_id_counter = Self::get_redeem_id_counter(db) + 1;
-        Self::set_redeem_id_counter(db, redeem_id_counter);
-        redeem_id_counter
-    }
-
-    pub fn remove_redeem_request<B: Backend>(
-        db: &mut Db<B>,
-        redeem_id: u64,
-    ) -> Result<RedeemRequest> {
-        let mut pending_redeem_requests = Self::get_pending_redeem_requests(db);
-        let index = pending_redeem_requests
-            .iter()
-            .cloned()
-            .position(|pending_redeem_request| pending_redeem_request.id == redeem_id)
-            .ok_or(anyhow!("Redeem request {} not found", redeem_id))?;
-        let pending_redeem_request = pending_redeem_requests[index].clone();
-        pending_redeem_requests.remove(index);
-        Self::set_pending_redeem_requests(db, pending_redeem_requests);
-        Ok(pending_redeem_request)
+    fn increment_withdrawl_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
+        let withdrawl_id_counter = Self::get_withdrawl_id_counter(db) + 1;
+        Self::set_withdrawl_id_counter(db, withdrawl_id_counter);
+        withdrawl_id_counter
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Bridge;
+    use super::{Bridge, PolygonMessage};
     use crate::{constants::BASE_FACTOR, Token};
     use ellipticoin_test_framework::{
         constants::{actors::ALICE, tokens::APPLES},
@@ -188,64 +144,33 @@ mod tests {
     };
 
     #[test]
-    fn test_mint() {
+    fn test_deposit() {
         let mut db = new_db();
-        Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
+        Bridge::process_polygon_messages(
+            &mut db,
+            vec![PolygonMessage::Deposit(1 * BASE_FACTOR, APPLES, ALICE)],
+            1,
+        )
+        .unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES,), 1 * BASE_FACTOR);
     }
 
     #[test]
-    fn test_redeem() {
+    fn test_withdrawl() {
         let mut db = new_db();
-        Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
-        Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
-        Bridge::redeem(&mut db, 0).unwrap();
+        Bridge::process_polygon_messages(
+            &mut db,
+            vec![PolygonMessage::Deposit(1 * BASE_FACTOR, APPLES, ALICE)],
+            1,
+        )
+        .unwrap();
+        Bridge::create_withdrawl_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
+        Bridge::process_polygon_messages(
+            &mut db,
+            vec![PolygonMessage::ProcessWithdrawl(0, [0; 32])],
+            1,
+        )
+        .unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0);
-    }
-
-    #[test]
-    fn test_create_redeem_request() {
-        let mut db = new_db();
-        Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
-        Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
-        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0 * BASE_FACTOR);
-    }
-
-    #[test]
-    fn test_sign_redeem_request() {
-        let mut db = new_db();
-        Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
-        Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
-        Bridge::sign_redeem_request(&mut db, 0, 1, vec![1, 2, 3]).unwrap();
-        assert_eq!(
-            Bridge::get_pending_redeem_requests(&mut db)
-                .first()
-                .unwrap()
-                .signature
-                .as_ref()
-                .unwrap()
-                .to_vec(),
-            vec![1, 2, 3]
-        );
-        assert_eq!(
-            Bridge::get_pending_redeem_requests(&mut db)
-                .first()
-                .unwrap()
-                .expiration_block_number
-                .as_ref()
-                .unwrap()
-                .clone(),
-            1
-        );
-        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0 * BASE_FACTOR);
-    }
-
-    #[test]
-    fn test_cancel_redeem_request() {
-        let mut db = new_db();
-        Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
-        Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
-        Bridge::cancel_redeem_request(&mut db, 0).unwrap();
-        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1 * BASE_FACTOR);
     }
 }

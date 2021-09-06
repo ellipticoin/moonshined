@@ -14,7 +14,8 @@ use std::{
     time::Duration,
 };
 
-pub const NETWORK_ID: u64 = 0;
+pub const NETWORK_ID: u64 = 24;
+pub const GAS_LIMIT: u64 = 21000;
 pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();
 
 lazy_static! {
@@ -26,11 +27,11 @@ lazy_static! {
             .open("var/transactions.cbor")
             .unwrap()
     );
-    pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);
+    pub static ref BLOCK_TIME: Duration = Duration::from_secs(3600);
     pub static ref TRANSACTION_QUEUE_SIZE: usize = 1000;
     pub static ref TRANSACTION_QUEUE: (
-        Sender<(SignedTransaction, oneshot::Sender<Result<()>>)>,
-        Receiver<(SignedTransaction, oneshot::Sender<Result<()>>)>
+        Sender<(SignedTransaction, oneshot::Sender<Result<u64>>)>,
+        Receiver<(SignedTransaction, oneshot::Sender<Result<u64>>)>
     ) = channel::bounded(*TRANSACTION_QUEUE_SIZE);
     pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref WEB_SOCKET_BROADCASTER: BroadcastChannel<(u32, String)> =
@@ -39,7 +40,7 @@ lazy_static! {
 }
 
 impl TRANSACTION_QUEUE {
-    pub async fn push(&self, transaction: SignedTransaction) -> oneshot::Receiver<Result<()>> {
+    pub async fn push(&self, transaction: SignedTransaction) -> oneshot::Receiver<Result<u64>> {
         let (sender, receiver) = oneshot::channel();
         self.0.send((transaction, sender)).await.unwrap();
         receiver

@@ -1,9 +1,9 @@
-use crate::db::get_hash_onion_layers_left;
 use crate::{
     config::{HASH_ONION_SIZE, PRIVATE_KEY},
-    crypto::sha256,
+    db::get_hash_onion_layers_left,
 };
 use async_std::sync::{Arc, Mutex};
+use ellipticoin_peerchain_ethereum::crypto::sha256;
 use indicatif::ProgressBar;
 
 lazy_static! {

@@ -2,7 +2,7 @@ mod validations;
 
 use crate::{
     charge,
-    constants::{MS, RATIFICATION_THRESHOLD},
+    constants::{MSX, RATIFICATION_THRESHOLD},
     contract::{self, Contract},
     pay,
     token::Token,
@@ -60,8 +60,8 @@ impl Governance {
         actions: Vec<Action>,
     ) -> Result<()> {
         Self::validate_minimum_proposal_theshold(db, sender)?;
-        let balance = Token::get_balance(db, sender, MS);
-        charge!(db, sender, MS, balance)?;
+        let balance = Token::get_balance(db, sender, MSX);
+        charge!(db, sender, MSX, balance)?;
         let mut proposals = Self::get_proposals(db);
         let proposal = Proposal {
             id: Self::get_proposal_id_counter(db),
@@ -90,8 +90,8 @@ impl Governance {
         choice: Choice,
     ) -> Result<()> {
         Self::validate_balance(db, sender)?;
-        let balance = Token::get_balance(db, sender, MS);
-        charge!(db, sender, MS, balance)?;
+        let balance = Token::get_balance(db, sender, MSX);
+        charge!(db, sender, MSX, balance)?;
         let mut proposals = Self::get_proposals(db);
         Self::validate_proposal_is_open(&proposals[proposal_id])?;
         proposals[proposal_id].votes.push(Vote {
@@ -101,9 +101,7 @@ impl Governance {
         });
         let votes_for = Self::tally(&proposals[proposal_id].votes, Choice::For);
         let votes_against = Self::tally(&proposals[proposal_id].votes, Choice::Against);
-        if votes_for * 100 / Token::get_total_supply(db, Ellipticoin::address())
-            > RATIFICATION_THRESHOLD
-        {
+        if votes_for * 100 / Token::get_total_supply(db, MSX) > RATIFICATION_THRESHOLD {
             for action in &proposals[proposal_id].actions {
                 action.run(db, Self::address())?;
             }
@@ -121,7 +119,7 @@ impl Governance {
 
     pub fn return_balances<B: Backend>(db: &mut Db<B>, votes: &[Vote]) {
         for vote in votes {
-            pay!(db, vote.voter, MS, vote.weight).unwrap();
+            pay!(db, vote.voter, MSX, vote.weight).unwrap();
         }
     }
 
@@ -148,7 +146,7 @@ impl Governance {
 #[cfg(test)]
 mod tests {
     use super::{Choice, Governance, Proposal, Vote};
-    use crate::{constants::MS, contract::Contract, Action, Token};
+    use crate::{constants::MSX, contract::Contract, Action, Token};
     use ellipticoin_test_framework::{
         constants::{
             actors::{ALICE, BOB, CAROL},
@@ -156,15 +154,17 @@ mod tests {
         },
         new_db,
     };
+    use ellipticoin_types::Uint;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     #[test]
     fn create_proposal() {
         let mut db = new_db();
-        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
-        Token::mint(&mut db, 1, MS, ALICE);
-        Token::mint(&mut db, 1, MS, BOB);
-        Token::mint(&mut db, 1, MS, CAROL);
+        let actions = vec![Action::Pay(ALICE, Uint::try_from(1u64).unwrap(), APPLES)];
+        Token::mint(&mut db, 1, MSX, ALICE);
+        Token::mint(&mut db, 1, MSX, BOB);
+        Token::mint(&mut db, 1, MSX, CAROL);
 
         Governance::create_proposal(
             &mut db,
@@ -200,8 +200,8 @@ mod tests {
         let actions = vec![];
         let mut votes = HashMap::new();
         votes.insert(ALICE, Choice::For);
-        Token::mint(&mut db, 1, MS, ALICE);
-        Token::mint(&mut db, 100, MS, BOB);
+        Token::mint(&mut db, 1, MSX, ALICE);
+        Token::mint(&mut db, 100, MSX, BOB);
 
         assert_eq!(
             Governance::create_proposal(
@@ -222,9 +222,9 @@ mod tests {
     #[test]
     fn vote_without_moonshine() {
         let mut db = new_db();
-        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
+        let actions = vec![Action::Pay(ALICE, Uint::try_from(1u64).unwrap(), APPLES)];
         Token::mint(&mut db, 1, APPLES, Governance::address());
-        Token::mint(&mut db, 1, MS, ALICE);
+        Token::mint(&mut db, 1, MSX, ALICE);
 
         Governance::create_proposal(
             &mut db,
@@ -247,11 +247,11 @@ mod tests {
     #[test]
     fn vote_after_poll_closed() {
         let mut db = new_db();
-        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
+        let actions = vec![Action::Pay(ALICE, Uint::try_from(1u64).unwrap(), APPLES)];
         Token::mint(&mut db, 1, APPLES, Governance::address());
-        Token::mint(&mut db, 1, MS, ALICE);
-        Token::mint(&mut db, 1, MS, BOB);
-        Token::mint(&mut db, 1, MS, CAROL);
+        Token::mint(&mut db, 1, MSX, ALICE);
+        Token::mint(&mut db, 1, MSX, BOB);
+        Token::mint(&mut db, 1, MSX, CAROL);
 
         Governance::create_proposal(
             &mut db,
@@ -275,11 +275,11 @@ mod tests {
     #[test]
     fn vote() {
         let mut db = new_db();
-        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
+        let actions = vec![Action::Pay(ALICE, Uint::try_from(1u64).unwrap(), APPLES)];
         Token::mint(&mut db, 1, APPLES, Governance::address());
-        Token::mint(&mut db, 1, MS, ALICE);
-        Token::mint(&mut db, 1, MS, BOB);
-        Token::mint(&mut db, 1, MS, CAROL);
+        Token::mint(&mut db, 1, MSX, ALICE);
+        Token::mint(&mut db, 1, MSX, BOB);
+        Token::mint(&mut db, 1, MSX, CAROL);
 
         Governance::create_proposal(
             &mut db,

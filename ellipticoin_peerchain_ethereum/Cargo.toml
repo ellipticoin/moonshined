@@ -10,17 +10,23 @@ edition = "2018"
 anyhow = "*"
 async-std = {version = "1.9.0", features = ["unstable", "attributes"]}
 base64 = "*"
+byte-slice-cast = "1.1.0"
 ellipticoin_contracts = {path = "../ellipticoin_contracts"}
 ellipticoin_types = {path = "../ellipticoin_types"}
+ethabi = "15.0.0"
+ethereum-types = "0.12.0"
+ethereum_abi = { git = "https://github.com/FelipeRosa/rust-ethereum-abi" }
+futures = "*"
 hex = "*"
 hex-literal = "0.2"
-k256 = {version = "0.7.2", features= ["ecdsa", "sha256", "ecdsa-core", "keccak256"]}
+k256 = {version = "0.9.6", features= ["ecdsa", "sha256", "ecdsa-core", "keccak256"]}
 lazy_static = "*"
-num-bigint = "*"
+num-bigint = "0.4.2"
 num-traits = "0.2.14"
-phf = { version = "0.7.24", features = ["macros"] }
 serde = { version = "*", features = ["derive"] }
 serde_cbor = "*"
+serde_eth = "0.1.1"
 serde_json = "*"
+sha2 = "0.9.1"
 sha3 = "*"
 surf = "*"

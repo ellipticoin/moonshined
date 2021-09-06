@@ -1,9 +1,9 @@
 use super::Ellipticoin;
-use crate::constants::{BASE_FACTOR, BTC, ETH};
+use crate::constants::{BASE_FACTOR, ETH, WBTC};
 use ellipticoin_types::Address;
 
 lazy_static! {
-    pub static ref INCENTIVISED_POOLS: Vec<Address> = vec![BTC.clone(), ETH.clone()];
+    pub static ref INCENTIVISED_POOLS: Vec<Address> = vec![WBTC.clone(), ETH.clone()];
 }
 
 const MIGRATION_TO_POLYGON_AT: u64 = 6_359_375;
@@ -13,7 +13,7 @@ const NUMBER_OF_ERAS: u64 = 8;
 impl Ellipticoin {
     pub fn block_reward_at(block: u64) -> u64 {
         if block > MIGRATION_TO_POLYGON_AT {
-          return 0
+            return 0;
         }
 
         if block > BLOCKS_PER_ERA * NUMBER_OF_ERAS {
@@ -34,7 +34,10 @@ mod tests {
 
     #[test]
     fn test_migration_to_polygon() {
-        assert_eq!(Ellipticoin::block_reward_at(MIGRATION_TO_POLYGON_AT), 1280000);
+        assert_eq!(
+            Ellipticoin::block_reward_at(MIGRATION_TO_POLYGON_AT),
+            1280000
+        );
         assert_eq!(Ellipticoin::block_reward_at(MIGRATION_TO_POLYGON_AT + 1), 0);
     }
 

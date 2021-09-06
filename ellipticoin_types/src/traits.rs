@@ -25,5 +25,5 @@ impl ToKey for Address {
 
 pub trait Run: core::fmt::Debug {
     fn sender(&self) -> Result<Address>;
-    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()>;
+    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<u64>;
 }

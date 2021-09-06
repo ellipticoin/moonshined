@@ -1,4 +1,5 @@
 use super::AMM;
+use crate::constants::USD;
 use anyhow::{bail, Result};
 use ellipticoin_types::{
     db::{Backend, Db},
@@ -6,7 +7,7 @@ use ellipticoin_types::{
 };
 impl AMM {
     pub fn validate_pool_does_not_exist<B: Backend>(db: &mut Db<B>, token: Address) -> Result<()> {
-        if Self::get_pool_supply_of_base_token(db, token) != 0 {
+        if Self::get_pool_supply_of_usd(db, token) != 0 {
             bail!("Pool already exisits: {}", hex::encode(token))
         } else {
             Ok(())
@@ -29,6 +30,14 @@ impl AMM {
             Ok(())
         } else {
             bail!("Maximum slippage exceeded")
+        }
+    }
+
+    pub fn validate_token_is_not_usd(token: Address) -> Result<()> {
+        if token == USD {
+            bail!("invalid token")
+        } else {
+            Ok(())
         }
     }
 }

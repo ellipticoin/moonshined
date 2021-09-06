@@ -1,11 +1,10 @@
-use ellipticoind::constants::TRANSACTIONS_FILE;
 use ellipticoind::{
     config::{SubCommand, OPTS},
+    constants::TRANSACTIONS_FILE,
     db,
     sub_commands::{self, generate_keypair},
 };
-use std::io::Write;
-use std::process;
+use std::{io::Write, process};
 
 #[async_std::main]
 async fn main() {

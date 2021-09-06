@@ -63,7 +63,7 @@ pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
     )
     .await
     .map_err(|e| {
-        println!("{}", e.to_string());
+        // println!("{}", e.to_string());
         http_types::Error::from_str(StatusCode::BadRequest, e.to_string())
     })?;
 

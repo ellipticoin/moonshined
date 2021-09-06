@@ -3,6 +3,7 @@ pub mod app;
 mod blocks;
 pub mod graphql;
 mod helpers;
+pub mod json_rpc;
 mod middleware;
 mod mutations;
 mod query_root;

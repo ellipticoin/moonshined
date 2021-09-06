@@ -1,7 +1,6 @@
 pub mod memory_backend;
 pub mod sled_backend;
-use crate::config::address;
-use crate::constants::DB;
+use crate::{config::address, constants::DB};
 use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use ellipticoin_contracts::{Bridge, Ellipticoin, Miner, System};
 pub use memory_backend::MemoryBackend;
@@ -111,6 +110,11 @@ pub async fn get_hash_onion_layers_left() -> Option<u64> {
 pub async fn get_block_number() -> u64 {
     let mut db = aquire_db_read_lock!();
     System::get_block_number(&mut db)
+}
+
+pub async fn get_polygon_block_number() -> u64 {
+    let mut db = aquire_db_read_lock!();
+    Bridge::get_polygon_block_number(&mut db)
 }
 
 pub async fn get_ethereum_block_number() -> u64 {

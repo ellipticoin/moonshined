@@ -3,15 +3,15 @@ use std::convert::TryInto;
 
 #[derive(Clone, Debug)]
 pub struct BlockchainState {
-    pub base_token_exchange_rate: BigUint,
+    pub usd_exchange_rate: BigUint,
     pub bridge_address: Address,
     pub signers: Vec<Bytes>,
 }
 
 #[juniper::graphql_object]
 impl BlockchainState {
-    fn base_token_exchange_rate(&self) -> BigUint {
-        self.base_token_exchange_rate.clone()
+    fn usd_exchange_rate(&self) -> BigUint {
+        self.usd_exchange_rate.clone()
     }
 
     fn bridge_address(&self) -> Address {
@@ -26,7 +26,6 @@ impl BlockchainState {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub address: Address,
-    pub interest_rate: Option<U64>,
     pub price: U64,
     pub underlying_exchange_rate: U64,
     pub balance: U64,
@@ -37,10 +36,6 @@ pub struct Token {
 impl Token {
     fn address(&self) -> Address {
         self.address.clone()
-    }
-
-    fn interest_rate(&self) -> Option<U64> {
-        self.interest_rate.clone()
     }
 
     fn price(&self) -> U64 {
@@ -66,8 +61,8 @@ pub struct LiquidityToken {
     pub balance: U64,
     pub total_supply: U64,
     pub pool_supply_of_token: U64,
-    pub pool_supply_of_base_token: U64,
-    pub underlying_pool_supply_of_base_token: U64,
+    pub pool_supply_of_usd: U64,
+    pub underlying_pool_supply_of_usd: U64,
 }
 
 #[juniper::graphql_object]
@@ -88,12 +83,12 @@ impl LiquidityToken {
         self.pool_supply_of_token.clone()
     }
 
-    fn pool_supply_of_base_token(&self) -> U64 {
-        self.pool_supply_of_base_token.clone()
+    fn pool_supply_of_usd(&self) -> U64 {
+        self.pool_supply_of_usd.clone()
     }
 
-    fn underlying_pool_supply_of_base_token(&self) -> U64 {
-        self.underlying_pool_supply_of_base_token.clone()
+    fn underlying_pool_supply_of_usd(&self) -> U64 {
+        self.underlying_pool_supply_of_usd.clone()
     }
 }
 
@@ -201,7 +196,7 @@ pub struct RedeemRequest {
     pub token: Address,
     pub amount: U64,
     pub expiration_block_number: U64,
-    pub signature: Bytes,
+    pub signature: Option<Bytes>,
 }
 
 #[juniper::graphql_object]
@@ -226,7 +221,7 @@ impl RedeemRequest {
         self.expiration_block_number.clone()
     }
 
-    fn signature(&self) -> Bytes {
+    fn signature(&self) -> Option<Bytes> {
         self.signature.clone()
     }
 }
@@ -407,13 +402,13 @@ where
     S: ScalarValue,
 {
     fn resolve(&self) -> Value {
-        Value::scalar(base64::encode(&self.0))
+        Value::scalar(format!("0x{}", hex::encode(&self.0)))
     }
 
     fn from_input_value(v: &InputValue) -> Option<Address> {
         v.as_scalar_value()
             .and_then(|v| v.as_str())
-            .map(|v| base64::decode(v))
+            .map(|v| hex::decode(v.trim_start_matches("0x")))
             .and_then(Result::ok)
             .map(|inner| inner[..20].try_into())
             .and_then(Result::ok)
