@@ -1,10 +1,12 @@
 mod issuance;
 
 use crate::{
-    constants::{INCENTIVISED_POOLS, MINER_ALLOW_LIST},
+    constants::MINER_ALLOW_LIST,
     contract::{self, Contract},
     crypto::sha256,
-    pay, System, Token, AMM,
+    pay,
+    token::tokens::INCENTIVISED_POOLS,
+    System, Token, AMM,
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;

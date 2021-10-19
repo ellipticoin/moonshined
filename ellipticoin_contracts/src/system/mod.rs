@@ -1,8 +1,8 @@
 use crate::{
     bridge::{EthereumMessage, PolygonMessage},
-    constants::{TOKENS, USD},
     contract::{self, Contract},
     crypto::ed25519_verify,
+    token::tokens::{TOKENS, USD},
     Bridge, Ellipticoin, Token, AMM,
 };
 use anyhow::{anyhow, Result};

@@ -1,8 +1,4 @@
-use crate::{
-    constants::{BASE_FACTOR, MSX},
-    governance::Proposal,
-    Governance, Token,
-};
+use crate::{constants::BASE_FACTOR, governance::Proposal, token::tokens::MSX, Governance, Token};
 use anyhow::{bail, Result};
 use ellipticoin_types::{db::Backend, Address, Db};
 

@@ -1,8 +1,10 @@
 pub mod macros;
+pub mod tokens;
 
 use crate::{
-    constants::{BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA, USD},
+    constants::{BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA},
     contract::{self, Contract},
+    token::tokens::USD,
     AMM,
 };
 use anyhow::{bail, Result};

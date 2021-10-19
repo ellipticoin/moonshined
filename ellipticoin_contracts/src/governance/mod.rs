@@ -2,9 +2,10 @@ mod validations;
 
 use crate::{
     charge,
-    constants::{MSX, RATIFICATION_THRESHOLD},
+    constants::RATIFICATION_THRESHOLD,
     contract::{self, Contract},
     pay,
+    token::tokens::MSX,
     token::Token,
     Action, Ellipticoin,
 };
@@ -146,7 +147,8 @@ impl Governance {
 #[cfg(test)]
 mod tests {
     use super::{Choice, Governance, Proposal, Vote};
-    use crate::{constants::MSX, contract::Contract, Action, Token};
+    use crate::token::tokens::MSX;
+    use crate::{contract::Contract, Action, Token};
     use ellipticoin_test_framework::{
         constants::{
             actors::{ALICE, BOB, CAROL},

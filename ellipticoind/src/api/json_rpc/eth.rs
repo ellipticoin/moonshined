@@ -9,7 +9,7 @@ use crate::{
     constants::{DB, GAS_LIMIT},
     transaction,
 };
-use ellipticoin_contracts::{constants::USD, System};
+use ellipticoin_contracts::{token::tokens::USD, System};
 use ellipticoin_types::Address;
 use num_bigint::BigUint;
 use num_traits::Zero;

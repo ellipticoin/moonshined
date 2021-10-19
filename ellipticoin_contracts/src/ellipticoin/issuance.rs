@@ -1,5 +1,6 @@
 use super::Ellipticoin;
-use crate::constants::{BASE_FACTOR, ETH, WBTC};
+use crate::constants::BASE_FACTOR;
+use crate::token::tokens::{ETH, WBTC};
 use ellipticoin_types::Address;
 
 lazy_static! {

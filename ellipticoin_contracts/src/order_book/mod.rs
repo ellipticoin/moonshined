@@ -1,8 +1,9 @@
 use crate::{
     charge,
-    constants::{BASE_FACTOR, BASE_TOKEN},
+    constants::BASE_FACTOR,
     contract::{self, Contract},
     pay,
+    token::tokens::USD,
     token::Token,
 };
 use anyhow::{anyhow, bail, Result};
@@ -69,7 +70,7 @@ impl OrderBook {
         };
         match order.order_type {
             OrderType::Buy => {
-                charge!(db, sender, BASE_TOKEN, amount * price / BASE_FACTOR)?;
+                charge!(db, sender, USD, amount * price / BASE_FACTOR)?;
             }
             OrderType::Sell => {
                 charge!(db, sender, token, amount)?;
@@ -93,7 +94,7 @@ impl OrderBook {
         }
         match orders[index].order_type {
             OrderType::Buy => {
-                pay!(db, sender, BASE_TOKEN, orders[index].amount)?;
+                pay!(db, sender, USD, orders[index].amount)?;
             }
             OrderType::Sell => {
                 pay!(db, sender, orders[index].token, orders[index].amount)?;
@@ -115,12 +116,7 @@ impl OrderBook {
         match order.order_type {
             OrderType::Buy => {
                 Token::transfer(db, sender, order.sender, order.amount, order.token)?;
-                pay!(
-                    db,
-                    sender,
-                    BASE_TOKEN,
-                    order.amount * order.price / BASE_FACTOR
-                )?;
+                pay!(db, sender, USD, order.amount * order.price / BASE_FACTOR)?;
             }
             OrderType::Sell => {
                 Token::transfer(
@@ -128,7 +124,7 @@ impl OrderBook {
                     sender,
                     order.sender,
                     order.amount * order.price / BASE_FACTOR,
-                    BASE_TOKEN,
+                    USD,
                 )?;
                 pay!(db, sender, order.token, order.amount)?;
             }
@@ -149,7 +145,7 @@ impl OrderBook {
 #[cfg(test)]
 mod tests {
     use super::{Order, OrderBook, OrderType};
-    use crate::{constants::BASE_FACTOR, order_book::BASE_TOKEN, Token};
+    use crate::{constants::BASE_FACTOR, order_book::USD, Token};
     use ellipticoin_test_framework::{
         constants::{
             actors::{ALICE, BOB},
@@ -190,25 +186,25 @@ mod tests {
     fn test_fill_sell() {
         let mut db = new_db();
         Token::set_balance(&mut db, ALICE, APPLES, 1);
-        Token::set_balance(&mut db, BOB, BASE_TOKEN, 1);
+        Token::set_balance(&mut db, BOB, USD, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, BASE_FACTOR).unwrap();
         OrderBook::fill(&mut db, BOB, 0).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0);
-        assert_eq!(Token::get_balance(&mut db, ALICE, BASE_TOKEN), 1);
+        assert_eq!(Token::get_balance(&mut db, ALICE, USD), 1);
         assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 1);
-        assert_eq!(Token::get_balance(&mut db, BOB, BASE_TOKEN), 0);
+        assert_eq!(Token::get_balance(&mut db, BOB, USD), 0);
     }
 
     #[test]
     fn test_fill_buy() {
         let mut db = new_db();
-        Token::set_balance(&mut db, ALICE, BASE_TOKEN, 1);
+        Token::set_balance(&mut db, ALICE, USD, 1);
         Token::set_balance(&mut db, BOB, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Buy, 1, APPLES, BASE_FACTOR).unwrap();
         OrderBook::fill(&mut db, BOB, 0).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
-        assert_eq!(Token::get_balance(&mut db, ALICE, BASE_TOKEN), 0);
+        assert_eq!(Token::get_balance(&mut db, ALICE, USD), 0);
         assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 0);
-        assert_eq!(Token::get_balance(&mut db, BOB, BASE_TOKEN), 1);
+        assert_eq!(Token::get_balance(&mut db, BOB, USD), 1);
     }
 }

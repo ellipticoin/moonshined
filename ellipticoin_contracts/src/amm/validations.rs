@@ -1,5 +1,5 @@
 use super::AMM;
-use crate::constants::USD;
+use crate::token::tokens::USD;
 use anyhow::{bail, Result};
 use ellipticoin_types::{
     db::{Backend, Db},

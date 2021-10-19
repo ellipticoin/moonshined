@@ -14,7 +14,7 @@ use crate::constants::{
 use async_std::{prelude::*, stream};
 use ellipticoin_contracts::{
     bridge::PolygonMessage,
-    constants::{MATIC, TOKENS, TOKEN_DECIMALS},
+    token::tokens::{MATIC, TOKENS, TOKEN_DECIMALS},
 };
 
 use ellipticoin_peerchain_ethereum::json_rpc::Block;

@@ -19,7 +19,7 @@ pub mod hash_onion;
 mod helpers;
 pub mod order_book;
 pub mod system;
-mod token;
+pub mod token;
 mod types;
 
 pub use amm::AMM;

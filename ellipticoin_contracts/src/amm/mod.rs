@@ -1,10 +1,12 @@
 mod validations;
 use crate::{
     charge,
-    constants::{BASE_FACTOR, FEE, USD},
+    constants::{BASE_FACTOR, FEE},
     contract::{self, Contract},
     helpers::proportion_of,
-    pay, Token,
+    pay,
+    token::tokens::USD,
+    Token,
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
@@ -351,7 +353,8 @@ impl AMM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{BASE_FACTOR, USD};
+    use crate::constants::BASE_FACTOR;
+    use crate::token::tokens::USD;
 
     use ellipticoin_test_framework::{
         constants::{
