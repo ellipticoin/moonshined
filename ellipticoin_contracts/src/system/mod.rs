@@ -71,10 +71,8 @@ impl Action {
                 AMM::create_pool(db, sender, (*amount).try_into()?, *token, starting_price)
             }
             Action::CreateWithdrawlRequest(underlying_amount, token) => {
-                println!("{:?}", underlying_amount);
                 let amount =
                     Token::underlying_to_amount(db, (*underlying_amount).try_into()?, *token);
-                println!("{}", amount);
                 Bridge::create_withdrawl_request(db, sender, (amount).try_into()?, *token)
             }
             Action::Null => Ok(()),
