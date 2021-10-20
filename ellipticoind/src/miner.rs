@@ -15,7 +15,8 @@ async fn mine_block() {
     println!("Won block #{}", db::get_block_number().await);
     run_for(*BLOCK_TIME, async {
         loop {
-            TRANSACTION_QUEUE.process_next_transaction().await
+            TRANSACTION_QUEUE.process_next_transaction().await;
+            WEB_SOCKET_BROADCASTER.broadcast().await;
         }
     })
     .await;

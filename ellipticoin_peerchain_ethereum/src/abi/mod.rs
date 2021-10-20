@@ -1,14 +1,18 @@
 mod ellipticoin_abi;
 mod signature_hashes;
 
+use crate::constants::ELLIPTICOIN_DECIMALS;
 use byte_slice_cast::AsByteSlice;
 use ellipticoin_abi::ELLIPTICOIN_ABI;
+use ellipticoin_contracts::token::tokens::USD;
 use ellipticoin_contracts::{
     bridge::{EthereumMessage, PolygonMessage},
     system::Action,
 };
 use ellipticoin_types::{Address, Uint};
-
+use num_bigint::BigUint;
+use num_traits::pow;
+use num_traits::ToPrimitive;
 use std::{
     convert::{TryFrom, TryInto},
     fmt,
@@ -134,7 +138,30 @@ pub fn encode_action(action: &Action) -> Vec<u8> {
     .concat()
 }
 
-pub fn decode_action(_to: &[u8], _value: &[u8], data: &[u8]) -> Result<Action> {
+pub fn decode_action(to: &[u8], value: &[u8], data: &[u8]) -> Result<Action> {
+    if data.len() > 0 {
+        decode_transcation_data(data)
+    } else {
+        Ok(Action::Pay(
+            Address::try_from(to).map_err(|_| AbiError)?,
+            decode_transcation_value(value),
+            USD,
+        ))
+    }
+}
+pub fn decode_transcation_value(value: &[u8]) -> Uint {
+    Uint::try_from(
+        (BigUint::from_bytes_be(value)
+            / BigUint::from(pow(
+                BigUint::from(10u32),
+                18 as usize - *ELLIPTICOIN_DECIMALS,
+            )))
+        .to_u64()
+        .unwrap(),
+    )
+    .unwrap()
+}
+pub fn decode_transcation_data(data: &[u8]) -> Result<Action> {
     let f = ELLIPTICOIN_ABI
         .decode_input_from_slice(data)
         .map_err(|_| AbiError)?;

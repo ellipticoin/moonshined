@@ -33,6 +33,6 @@ pub const TRANSFER_TOPIC: [u8; 32] =
 pub const EXCHANGE_RATE_CURRENT_SELECTOR: [u8; 4] = hex!("bd6d894d");
 pub const SUPPLY_RATE_PER_BLOCK_SELECTOR: [u8; 4] = hex!("ae9d70b0");
 pub const BRIDGE_ADDRESS: Address = Address(hex!("53507c188a5b1bfca4ed27f45ae8b2e2324ed24d"));
-pub const SAFE_ADDRESS: Address = Address(hex!("3073ac44aA1b95f2fe71Bb2eb36b9CE27892F8ee"));
+pub const SAFE_ADDRESS: Address = Address(hex!("DE892F0Ba04B3923A01a8384C947a346BA296197"));
 pub const ETH_ADDRESS: Address = Address(hex!("0000000000000000000000000000000000000000"));
 pub const CHAIN_ID: u64 = 137;
