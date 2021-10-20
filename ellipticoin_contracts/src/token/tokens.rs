@@ -15,11 +15,22 @@ define_token!(AAVE, "d6df932a45c0f255f85145f286ea0b292b21c90b");
 define_token!(UNI, "b33eaad8d922b1083446dc23f610c2567fb5180f");
 
 lazy_static! {
-    pub static ref TOKEN_DECIMALS: HashMap<Address, u8> =
-        vec![(CUSDC, 8), (MSX, 6), (WBTC, 8), (ETH, 18), (MATIC, 18),]
-            .into_iter()
-            .collect();
-    pub static ref TOKENS: [Address; 5] = [WBTC, MSX, ETH, CUSDC, COMP];
+    pub static ref TOKEN_DECIMALS: HashMap<Address, u8> = vec![
+        (WBTC, 8),
+        (ETH, 18),
+        (MSX, 6),
+        (CUSDC, 8),
+        (MATIC, 18),
+        (COMP, 18),
+        (LINK, 18),
+        (QUICK, 18),
+        (AAVE, 18),
+        (UNI, 18),
+    ]
+    .into_iter()
+    .collect();
+    pub static ref TOKENS: [Address; 11] =
+        [WBTC, ETH, MSX, CUSDC, MATIC, COMP, SOL, LINK, QUICK, AAVE, UNI,];
 }
 pub const USD: Address = CUSDC;
 pub const INCENTIVISED_POOLS: [Address; 2] = [WBTC, ETH];
