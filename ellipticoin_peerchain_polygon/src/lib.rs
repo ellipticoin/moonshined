@@ -17,6 +17,8 @@ use ellipticoin_contracts::{
     token::tokens::{MATIC, TOKENS, TOKEN_DECIMALS},
 };
 
+
+use async_std::sync::RwLock;
 use ellipticoin_peerchain_ethereum::json_rpc::Block;
 use ellipticoin_peerchain_ethereum::json_rpc::{encode_address_topic, encode_topic};
 use ellipticoin_types::Address;
@@ -26,13 +28,13 @@ use num_bigint::BigUint;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::json;
 use std::convert::TryInto;
-use std::sync::atomic::{AtomicU64, Ordering};
 use surf;
 
-static BLOCK_NUMBER: AtomicU64 = AtomicU64::new(0);
+lazy_static! {
+    pub static ref BLOCK_NUMBER: RwLock<u64> = RwLock::new(0);
+}
 
 pub fn event_stream(latest_block: u64) -> impl Stream<Item = (Vec<PolygonMessage>, u64)> {
-    BLOCK_NUMBER.store(latest_block, Ordering::Relaxed);
     Box::pin(
         stream::once(())
             .chain(stream::interval(*POLL_INTERVAL))
@@ -41,8 +43,9 @@ pub fn event_stream(latest_block: u64) -> impl Stream<Item = (Vec<PolygonMessage
 }
 
 pub async fn poll(latest_block: u64) -> Option<(Vec<PolygonMessage>, u64)> {
+    let mut block_number = BLOCK_NUMBER.write().await;
     let current_block = PROVIDER.get_current_block().await.unwrap();
-    if current_block == BLOCK_NUMBER.load(Ordering::Relaxed) {
+    if current_block <= *block_number {
         None
     } else {
         // If we're greater than 128 blocks behind assume there was a restart
@@ -50,7 +53,7 @@ pub async fn poll(latest_block: u64) -> Option<(Vec<PolygonMessage>, u64)> {
         let from_block = if current_block - latest_block > 128 {
             current_block
         } else {
-            BLOCK_NUMBER.load(Ordering::Relaxed) + 1
+            *block_number + 1
         };
 
         let messages = vec![
@@ -58,8 +61,8 @@ pub async fn poll(latest_block: u64) -> Option<(Vec<PolygonMessage>, u64)> {
             get_token_deposits(from_block, current_block).await.unwrap(),
         ]
         .concat();
-        BLOCK_NUMBER.store(latest_block, Ordering::Relaxed);
         if messages.len() > 0 {
+            *block_number = current_block;
             Some((messages, current_block))
         } else {
             None
