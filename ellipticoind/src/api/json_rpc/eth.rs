@@ -1,19 +1,24 @@
 use super::{
     encoders::{encode_amount, encode_bytes, encode_token_amount, encode_u64_as_hash},
-    errors::{Result, INVALID_SENDER, PARSE_ERROR},
-    parsers::{parse_block_tag, parse_bytes, parse_signed_transaction, parse_u64},
+    errors::{Result, PARSE_ERROR},
+    parsers::{parse_address, parse_block_tag, parse_bytes, parse_signed_transaction, parse_u64},
 };
 use crate::{
     aquire_db_read_lock,
     config::OPTS,
-    constants::{DB, GAS_LIMIT},
+    constants::{DB, DEFAULT_GAS_LIMIT},
     transaction,
 };
-use ellipticoin_contracts::{token::tokens::USD, System};
+use ellipticoin_contracts::{
+    token::tokens::{TOKEN_METADATA, USD},
+    System,
+};
+use ellipticoin_peerchain_ethereum::abi::erc20_abi;
 use ellipticoin_types::Address;
 use num_bigint::BigUint;
 use num_traits::Zero;
 use serde_json::{json, Value};
+use std::convert::TryFrom;
 use std::convert::TryInto;
 
 pub fn chain_id(_params: &Value) -> Result<Value> {
@@ -21,7 +26,7 @@ pub fn chain_id(_params: &Value) -> Result<Value> {
 }
 
 pub fn estimate_gas(_params: &Value) -> Result<Value> {
-    Ok(json!(encode_amount(GAS_LIMIT.into())))
+    Ok(json!(encode_amount(DEFAULT_GAS_LIMIT.into())))
 }
 
 pub async fn block_number(_params: &Value) -> Result<Value> {
@@ -120,14 +125,54 @@ pub async fn get_balance(params: &Value) -> Result<Value> {
 
 pub async fn send_raw_transaction(params: &Value) -> Result<Value> {
     let signed_transaction = parse_signed_transaction(&params[0])?;
-    signed_transaction
-        .recover_address()
-        .map_err(|_| INVALID_SENDER)?;
     let transaction_id = transaction::dispatch(signed_transaction).await.unwrap();
     //.map_err(|_| PARSE_ERROR)?;
     Ok(encode_u64_as_hash(transaction_id))
 }
 
-pub async fn call(_params: &Value) -> Result<Value> {
-    Ok(json!(null))
+pub async fn call(params: &Value) -> Result<Value> {
+    let to = parse_address(params[0].get("to").ok_or(PARSE_ERROR)?)?;
+    if TOKEN_METADATA.get(&to).is_some() {
+        let f = erc20_abi::ERC20_ABI
+            .decode_input_from_slice(&parse_bytes(params[0].get("data").ok_or(PARSE_ERROR)?)?)
+            .map_err(|_| PARSE_ERROR)?;
+
+        match f.0.name.as_ref() {
+            "symbol" => Ok(json!(encode_bytes(&ethereum_abi::Value::encode(&[
+                ethereum_abi::Value::String(
+                    TOKEN_METADATA
+                        .get(&to)
+                        .ok_or(PARSE_ERROR)?
+                        .symbol
+                        .to_string()
+                )
+            ])))),
+            "decimals" => Ok(json!(encode_bytes(&ethereum_abi::Value::encode(&[
+                ethereum_abi::Value::Uint(
+                    ethabi::ethereum_types::U256::try_from(
+                        TOKEN_METADATA.get(&to).ok_or(PARSE_ERROR)?.decimals // 0
+                    )
+                    .unwrap(),
+                    256
+                )
+            ])))),
+            "balanceOf" => {
+                let mut db = aquire_db_read_lock!();
+                let address = if let ethereum_abi::Value::Address(address) = f.1[0].value {
+                    Address(address.as_bytes().try_into().unwrap())
+                } else {
+                    panic!("")
+                };
+
+                let balance =
+                    ellipticoin_contracts::Token::get_underlying_balance(&mut db, address, to);
+
+                Ok(encode_token_amount(balance))
+            }
+            _ => Ok(json!(null)),
+        }
+        // println!("token")
+    } else {
+        Ok(json!(null))
+    }
 }

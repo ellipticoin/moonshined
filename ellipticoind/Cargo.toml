@@ -19,6 +19,8 @@ ellipticoin_macros = {path = "../ellipticoin_macros"}
 ellipticoin_peerchain_ethereum = {path = "../ellipticoin_peerchain_ethereum"}
 ellipticoin_peerchain_polygon = {path = "../ellipticoin_peerchain_polygon"}
 ellipticoin_types = {path = "../ellipticoin_types"}
+ethabi = "15.0.0"
+ethereum_abi = { git = "https://github.com/FelipeRosa/rust-ethereum-abi" }
 futures = "0.3.12"
 graphql_client = "0.9.0"
 hex = "0.4.2"

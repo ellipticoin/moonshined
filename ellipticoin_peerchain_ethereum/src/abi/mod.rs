@@ -1,15 +1,18 @@
 mod ellipticoin_abi;
+pub mod erc20_abi;
 mod signature_hashes;
 
 use crate::constants::ELLIPTICOIN_DECIMALS;
 use byte_slice_cast::AsByteSlice;
 use ellipticoin_abi::ELLIPTICOIN_ABI;
+use ellipticoin_contracts::token::tokens::TOKEN_METADATA;
 use ellipticoin_contracts::token::tokens::USD;
 use ellipticoin_contracts::{
     bridge::{EthereumMessage, PolygonMessage},
     system::Action,
 };
 use ellipticoin_types::{Address, Uint};
+
 use num_bigint::BigUint;
 use num_traits::pow;
 use num_traits::ToPrimitive;
@@ -53,7 +56,14 @@ pub fn encode_action(action: &Action) -> Vec<u8> {
             ))
             .unwrap(),
         ],
-        Action::Pay(..) => vec![],
+        Action::Pay(recipient, underlying_amount, token) => vec![
+            signature_hashes::TRANSFER.to_vec(),
+            serde_eth::to_vec(&(
+                serde_eth::Address(recipient.into()),
+                serde_eth::U256(scale_up_token_decimals(*underlying_amount, *token).unwrap()),
+            ))
+            .unwrap(),
+        ],
         Action::RemoveLiquidity(percentage, token) => vec![
             signature_hashes::REMOVE_LIQUIDITY.to_vec(),
             serde_eth::to_vec(&((*percentage).as_i64(), serde_eth::Address(token.into()))).unwrap(),
@@ -140,7 +150,7 @@ pub fn encode_action(action: &Action) -> Vec<u8> {
 
 pub fn decode_action(to: &[u8], value: &[u8], data: &[u8]) -> Result<Action> {
     if data.len() > 0 {
-        decode_transcation_data(data)
+        decode_transcation_data(Address::try_from(to).map_err(|_| AbiError)?, data)
     } else {
         Ok(Action::Pay(
             Address::try_from(to).map_err(|_| AbiError)?,
@@ -161,7 +171,7 @@ pub fn decode_transcation_value(value: &[u8]) -> Uint {
     )
     .unwrap()
 }
-pub fn decode_transcation_data(data: &[u8]) -> Result<Action> {
+pub fn decode_transcation_data(to: Address, data: &[u8]) -> Result<Action> {
     let f = ELLIPTICOIN_ABI
         .decode_input_from_slice(data)
         .map_err(|_| AbiError)?;
@@ -195,7 +205,7 @@ pub fn decode_transcation_data(data: &[u8]) -> Result<Action> {
         "pay" => Ok(Action::Pay(
             decode(&f.1[0].value)?,
             decode(&f.1[1].value)?,
-            decode(&f.1[2].value)?,
+            to,
         )),
         "sell" => Ok(Action::Sell(
             decode(&f.1[0].value)?,
@@ -211,6 +221,11 @@ pub fn decode_transcation_data(data: &[u8]) -> Result<Action> {
             decode(&f.1[0].value)?,
             decode(&f.1[1].value)?,
             decode(&f.1[2].value)?,
+        )),
+        "transfer" => Ok(Action::Pay(
+            decode(&f.1[0].value)?,
+            decode_scaled_uint(&f.1[1].value, to)?,
+            to,
         )),
         _ => Err(AbiError),
     }
@@ -236,6 +251,44 @@ impl Encodable<'_> for Uint {
 impl Encodable<'_> for Address {
     fn encode(address: Self) -> ethereum_abi::Value {
         ethereum_abi::Value::Address(ethabi::ethereum_types::H160(address.0))
+    }
+}
+
+fn decode_scaled_uint(value: &ethereum_abi::Value, token: Address) -> Result<Uint> {
+    if let ethereum_abi::Value::Uint(u256, 256) = value {
+        scale_down_token_decimals(BigUint::from_bytes_le(u256.as_byte_slice()), token)
+    } else {
+        Err(AbiError)
+    }
+}
+
+fn scale_up_token_decimals(value: Uint, token: Address) -> Result<BigUint> {
+    Ok(scale_uint(
+        &BigUint::from(value.as_i64() as u64),
+        TOKEN_METADATA.get(&token).ok_or(AbiError)?.decimals as isize
+            - *ELLIPTICOIN_DECIMALS as isize,
+    ))
+}
+fn scale_down_token_decimals(value: BigUint, token: Address) -> Result<Uint> {
+    Ok(Uint::try_from(
+        scale_uint(
+            &value,
+            *ELLIPTICOIN_DECIMALS as isize
+                - TOKEN_METADATA.get(&token).ok_or(AbiError)?.decimals as isize,
+        )
+        .to_u64()
+        .ok_or(AbiError)?,
+    )
+    .map_err(|_| AbiError)?)
+}
+
+fn scale_uint(value: &BigUint, scale: isize) -> BigUint {
+    if scale == 0 {
+        value.clone()
+    } else if scale > 0 {
+        value * BigUint::from(pow(BigUint::from(10u8), scale.abs() as usize))
+    } else {
+        value / BigUint::from(pow(BigUint::from(10u8), scale.abs() as usize))
     }
 }
 

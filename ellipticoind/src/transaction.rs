@@ -1,12 +1,13 @@
 use crate::{
     aquire_db_read_lock, aquire_db_write_lock,
     config::{verification_key, HOST, OPTS},
-    constants::{DB, GAS_LIMIT, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
+    constants::{DB, DEFAULT_GAS_LIMIT, TRANSACTIONS_FILE, TRANSACTION_QUEUE, TRANSFER_GAS_LIMIT},
     hash_onion,
 };
 use anyhow::Result;
+
 use ellipticoin_contracts::{
-    contract::Contract, Action, Bridge, Ellipticoin, System, Transaction, AMM,
+    contract::Contract, token::tokens::CUSDC, Action, Bridge, Ellipticoin, System, Transaction, AMM,
 };
 use ellipticoin_peerchain_ethereum::{abi::encode_action, crypto, rlp, signature::Signature};
 
@@ -49,7 +50,10 @@ impl SignedTransaction {
                 .to_bytes_be()
                 .to_vec(),
             vec![],
-            BigUint::from_u64(GAS_LIMIT).unwrap().to_bytes_be().to_vec(),
+            BigUint::from_u64(self.gas_limit())
+                .unwrap()
+                .to_bytes_be()
+                .to_vec(),
             self.to().unwrap().0.to_vec(),
             self.value(),
             self.data(),
@@ -62,9 +66,22 @@ impl SignedTransaction {
         ])
     }
 
+    fn gas_limit(&self) -> u64 {
+        if matches!(&self.0.action, Action::Pay(..)) {
+            TRANSFER_GAS_LIMIT
+        } else {
+            DEFAULT_GAS_LIMIT
+        }
+    }
     fn to(&self) -> Option<Address> {
         Some(match &self.0.action {
-            Action::Pay(recipient, _amount, _token) => *recipient,
+            Action::Pay(recipient, _amount, token) => {
+                if *token == CUSDC {
+                    *recipient
+                } else {
+                    *token
+                }
+            }
             Action::CreatePool(..) => AMM::address(),
             Action::AddLiquidity(..) => AMM::address(),
             Action::Buy(..) => AMM::address(),
@@ -85,8 +102,13 @@ impl SignedTransaction {
 
     fn value(&self) -> Vec<u8> {
         match &self.0.action {
-            Action::Pay(_recipient, amount, _token) => {
-                (BigUint::from(amount) * BigUint::from(pow(BigUint::from(10u32), 12))).to_bytes_be()
+            Action::Pay(_recipient, amount, token) => {
+                if *token == CUSDC {
+                    (BigUint::from(amount) * BigUint::from(pow(BigUint::from(10u32), 12)))
+                        .to_bytes_be()
+                } else {
+                    vec![]
+                }
             }
             _ => vec![],
         }

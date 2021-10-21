@@ -1,10 +1,10 @@
+use crate::BRIDGE_ADDRESS;
 use crate::{
     bridge_abi::BRIDGE_ABI,
     constants::{ADDRESS, CHAIN_ID, PROVIDER},
 };
-use crate::{rlp, BRIDGE_ADDRESS};
 use ellipticoin_contracts::bridge::PendingWithdrawl;
-use ellipticoin_peerchain_ethereum::crypto::sign;
+use ellipticoin_peerchain_ethereum::{crypto::sign, rlp};
 use ethereum_abi::Value;
 use num_bigint::BigUint;
 use num_traits::FromPrimitive;

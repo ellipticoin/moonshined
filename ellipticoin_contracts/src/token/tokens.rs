@@ -14,7 +14,85 @@ define_token!(QUICK, "831753dd7087cac61ab5644b308642cc1c33dc13");
 define_token!(AAVE, "d6df932a45c0f255f85145f286ea0b292b21c90b");
 define_token!(UNI, "b33eaad8d922b1083446dc23f610c2567fb5180f");
 
+pub struct TokenMetadata<'a> {
+    pub decimals: u8,
+    pub symbol: &'a str,
+}
 lazy_static! {
+    pub static ref TOKEN_METADATA: HashMap<Address, TokenMetadata<'static>> = vec![
+        (
+            WBTC,
+            TokenMetadata {
+                decimals: 8,
+                symbol: "WBTC",
+            }
+        ),
+        (
+            ETH,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "ETH",
+            }
+        ),
+        (
+            MSX,
+            TokenMetadata {
+                decimals: 6,
+                symbol: "MSX",
+            }
+        ),
+        (
+            CUSDC,
+            TokenMetadata {
+                decimals: 8,
+                symbol: "CUSDC",
+            }
+        ),
+        (
+            MATIC,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "MATIC",
+            }
+        ),
+        (
+            COMP,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "COMP",
+            }
+        ),
+        (
+            LINK,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "LINK",
+            }
+        ),
+        (
+            QUICK,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "QUICK",
+            }
+        ),
+        (
+            AAVE,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "AAVE",
+            }
+        ),
+        (
+            UNI,
+            TokenMetadata {
+                decimals: 18,
+                symbol: "UNI",
+            }
+        ),
+    ]
+    .into_iter()
+    .collect();
     pub static ref TOKEN_DECIMALS: HashMap<Address, u8> = vec![
         (WBTC, 8),
         (ETH, 18),

@@ -1,8 +1,6 @@
 mod bridge_abi;
 
-pub mod abi;
 pub mod constants;
-pub mod rlp;
 pub mod withdrawls;
 pub use lazy_static::lazy_static;
 pub use withdrawls::process_withdrawl;
@@ -16,7 +14,6 @@ use ellipticoin_contracts::{
     bridge::PolygonMessage,
     token::tokens::{MATIC, TOKENS, TOKEN_DECIMALS},
 };
-
 
 use async_std::sync::RwLock;
 use ellipticoin_peerchain_ethereum::json_rpc::Block;

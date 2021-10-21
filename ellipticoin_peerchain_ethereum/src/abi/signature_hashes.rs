@@ -1,6 +1,7 @@
 use hex_literal::hex;
 pub const ADD_LIQUIDITY: [u8; 4] = hex!("1ee8621d"); // createPool(int64,address)
 pub const BUY: [u8; 4] = hex!("09d351a0"); // buy(int64,address,int64,address)
+pub const TRANSFER: [u8; 4] = hex!("a9059cbb"); // transfer(address,uint256)
 pub const CREATE_POOL: [u8; 4] = hex!("9f2c4c6f"); // createPool(int64,address,int64)
 pub const PROCESS_POLYGON_MESSAGES: [u8; 4] = hex!("00d961d1"); // processPolygonMessages((uint8,int64,address,address,int64,bytes32)[])
 pub const PROCESS_ETHEREUM_MESSAGES: [u8; 4] = hex!("c2ad2d7e"); // processEthereumMessages((uint8,int64,address,address,int64,bytes32)[])

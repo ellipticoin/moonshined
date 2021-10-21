@@ -114,8 +114,6 @@ export_native! {
             .to_vec()
             .eq(&sha256(value.to_vec()))
         {
-            println!("expected: {}", base64::encode(miners.first().unwrap().hash_onion_skin));
-            println!("got: {}", base64::encode(&sha256(value.to_vec())));
             return Err(Box::new(errors::INVALID_VALUE.clone()));
         }
         miners.first_mut().unwrap().hash_onion_skin = value.clone();

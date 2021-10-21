@@ -1159,6 +1159,8 @@ dependencies = [
  "ellipticoin_peerchain_ethereum",
  "ellipticoin_peerchain_polygon",
  "ellipticoin_types",
+ "ethabi",
+ "ethereum_abi",
  "futures",
  "graphql_client",
  "hex 0.4.3",
