@@ -1,13 +1,14 @@
 pub mod macros;
 pub mod tokens;
 
+use crate::token::tokens::TOKEN_METADATA;
 use crate::{
     constants::{BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA},
     contract::{self, Contract},
     token::tokens::USD,
     AMM,
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{
     db::{Backend, Db},
@@ -147,9 +148,12 @@ impl Token {
             bail!(
                 "{} has insufficient balance of {} have {} need {}",
                 hex::encode(address),
-                hex::encode(token),
-                balance,
-                amount
+                TOKEN_METADATA
+                    .get(&token)
+                    .ok_or(anyhow!("Unknown token"))?
+                    .symbol,
+                balance as f64 / 1000000.0,
+                amount as f64 / 1000000.0
             )
         }
     }

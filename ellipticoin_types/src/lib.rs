@@ -113,7 +113,7 @@ impl TryFrom<u64> for Uint {
 impl TryFrom<i64> for Uint {
     type Error = NegativeUintError;
     fn try_from(n: i64) -> Result<Self, Self::Error> {
-        if n > 0 {
+        if n >= 0 {
             Ok(Self(n.try_into().unwrap()))
         } else {
             Err(NegativeUintError(n))

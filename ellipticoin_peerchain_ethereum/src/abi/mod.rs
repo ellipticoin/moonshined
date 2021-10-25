@@ -336,7 +336,7 @@ impl Decodable<'_> for Uint {
             Uint::try_from(i64::from_le_bytes(
                 u256.as_byte_slice()[0..8].try_into().unwrap(),
             ))
-            .map_err(|_| AbiError)
+            .map_err(|_err| AbiError)
         } else {
             Err(AbiError)
         }

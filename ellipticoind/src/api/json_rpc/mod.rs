@@ -6,7 +6,7 @@ mod net;
 mod parsers;
 mod transaction;
 
-use errors::error_message;
+use errors::Error;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use tide::Request;
@@ -35,23 +35,27 @@ pub async fn handle_json_rpc(mut request: Request<()>) -> tide::Result {
         "eth_sendRawTransaction" => eth::send_raw_transaction(&request_json.params).await,
         "net_version" => net::version(&request_json),
         _ => return unsupported_method(&request_json),
+    };
+
+    match result {
+        Err(err) => error_response(&request_json.id, err),
+        Ok(result) => ok_response(&request_json.id, &result),
     }
-    .unwrap_or_else(|error_id| {
-        json!({
-        "jsonrpc":"2.0",
-          "id": error_id,"error":{"code":0,"message": error_message(error_id)}
-        })
-        .into()
-    });
-    response(&request_json.id, &result)
 }
 
 pub fn unsupported_method(request_json: &RequestJSON) -> tide::Result {
     Ok(
-json!({"jsonrpc": "2.0", "id": request_json.id, "error": {"code": -32601, "message": format!("Unsupported method [\"{}\"]. See available methods at https://docs.alchemy.com/alchemy/documentation/apis", request_json.method)}}).into())
+json!({"jsonrpc": "2.0", "id": request_json.id, "error": {"code": -32601, "message": format!("Unsupported method [\"{}\"]", request_json.method)}}).into())
 }
 
-pub fn response(id: &Value, result: &Value) -> tide::Result {
+pub fn error_response(id: &Value, error: Error) -> tide::Result {
+    Ok(json!(
+    {"jsonrpc":"2.0","id": id,"error":{"code":error.0,"message":error.1}}
+        )
+    .into())
+}
+
+pub fn ok_response(id: &Value, result: &Value) -> tide::Result {
     Ok(json!(
     {"jsonrpc": "2.0", "id": id, "result": result}
     )

@@ -3,6 +3,7 @@ use super::{
     errors::{Result, PARSE_ERROR},
     parsers::{parse_address, parse_block_tag, parse_bytes, parse_signed_transaction, parse_u64},
 };
+use crate::api::json_rpc::errors::SMART_CONTACT_ERROR;
 use crate::{
     aquire_db_read_lock,
     config::OPTS,
@@ -39,7 +40,6 @@ pub async fn block_number(_params: &Value) -> Result<Value> {
 pub async fn get_block_by_number(params: &Value) -> Result<Value> {
     let mut db = aquire_db_read_lock!();
     let block_number = parse_block_tag(&params[0]).await?;
-    // if let Some(block) = System::get_blocks(&mut db).get(block_number as usize - 1usize) {
     if System::get_transaction_id_counter(&mut db) <= block_number {
         Ok(json!(
         {
@@ -74,9 +74,9 @@ pub async fn get_code(_params: &Value) -> Result<Value> {
 pub async fn get_transaction_count(params: &Value) -> Result<Value> {
     let address: Address = params[0]
         .as_str()
-        .ok_or(PARSE_ERROR)?
+        .ok_or(PARSE_ERROR.clone())?
         .try_into()
-        .map_err(|_| PARSE_ERROR)?;
+        .map_err(|_| PARSE_ERROR.clone())?;
     let mut db = aquire_db_read_lock!();
     Ok(encode_amount(
         System::get_next_transaction_number(&mut db, address).into(),
@@ -113,9 +113,9 @@ pub async fn get_balance(params: &Value) -> Result<Value> {
     let mut db = aquire_db_read_lock!();
     let address: Address = params[0]
         .as_str()
-        .ok_or(PARSE_ERROR)?
+        .ok_or(PARSE_ERROR.clone())?
         .try_into()
-        .map_err(|_| PARSE_ERROR)?;
+        .map_err(|_| PARSE_ERROR.clone())?;
 
     let balance =
         ellipticoin_contracts::Token::get_underlying_balance(&mut db, address.clone().into(), USD);
@@ -125,24 +125,27 @@ pub async fn get_balance(params: &Value) -> Result<Value> {
 
 pub async fn send_raw_transaction(params: &Value) -> Result<Value> {
     let signed_transaction = parse_signed_transaction(&params[0])?;
-    let transaction_id = transaction::dispatch(signed_transaction).await.unwrap();
-    //.map_err(|_| PARSE_ERROR)?;
+    let transaction_id = transaction::dispatch(signed_transaction)
+        .await
+        .map_err(|err| (SMART_CONTACT_ERROR.clone(), err.to_string()))?;
     Ok(encode_u64_as_hash(transaction_id))
 }
 
 pub async fn call(params: &Value) -> Result<Value> {
-    let to = parse_address(params[0].get("to").ok_or(PARSE_ERROR)?)?;
+    let to = parse_address(params[0].get("to").ok_or(PARSE_ERROR.clone())?)?;
     if TOKEN_METADATA.get(&to).is_some() {
         let f = erc20_abi::ERC20_ABI
-            .decode_input_from_slice(&parse_bytes(params[0].get("data").ok_or(PARSE_ERROR)?)?)
-            .map_err(|_| PARSE_ERROR)?;
+            .decode_input_from_slice(&parse_bytes(
+                params[0].get("data").ok_or(PARSE_ERROR.clone())?,
+            )?)
+            .map_err(|_| PARSE_ERROR.clone())?;
 
         match f.0.name.as_ref() {
             "symbol" => Ok(json!(encode_bytes(&ethereum_abi::Value::encode(&[
                 ethereum_abi::Value::String(
                     TOKEN_METADATA
                         .get(&to)
-                        .ok_or(PARSE_ERROR)?
+                        .ok_or(PARSE_ERROR.clone())?
                         .symbol
                         .to_string()
                 )
@@ -150,7 +153,7 @@ pub async fn call(params: &Value) -> Result<Value> {
             "decimals" => Ok(json!(encode_bytes(&ethereum_abi::Value::encode(&[
                 ethereum_abi::Value::Uint(
                     ethabi::ethereum_types::U256::try_from(
-                        TOKEN_METADATA.get(&to).ok_or(PARSE_ERROR)?.decimals // 0
+                        TOKEN_METADATA.get(&to).ok_or(PARSE_ERROR.clone())?.decimals
                     )
                     .unwrap(),
                     256
@@ -171,7 +174,6 @@ pub async fn call(params: &Value) -> Result<Value> {
             }
             _ => Ok(json!(null)),
         }
-        // println!("token")
     } else {
         Ok(json!(null))
     }
