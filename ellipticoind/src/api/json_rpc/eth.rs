@@ -40,7 +40,7 @@ pub async fn block_number(_params: &Value) -> Result<Value> {
 pub async fn get_block_by_number(params: &Value) -> Result<Value> {
     let mut db = aquire_db_read_lock!();
     let block_number = parse_block_tag(&params[0]).await?;
-    if System::get_transaction_id_counter(&mut db) <= block_number {
+    if System::get_transaction_id_counter(&mut db) >= block_number {
         Ok(json!(
         {
               "hash":encode_u64_as_hash(block_number),
