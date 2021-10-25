@@ -1,11 +1,10 @@
 use crate::{
     aquire_db_read_lock, aquire_db_write_lock,
     config::{verification_key, HOST, OPTS},
-    constants::{DB, DEFAULT_GAS_LIMIT, TRANSACTIONS_FILE, TRANSACTION_QUEUE, TRANSFER_GAS_LIMIT},
+    constants::{DB, DEFAULT_GAS_LIMIT, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
     hash_onion,
 };
 use anyhow::Result;
-
 use ellipticoin_contracts::{
     contract::Contract, token::tokens::CUSDC, Action, Bridge, Ellipticoin, System, Transaction, AMM,
 };
@@ -68,7 +67,7 @@ impl SignedTransaction {
 
     fn gas_limit(&self) -> u64 {
         if matches!(&self.0.action, Action::Pay(..)) {
-            TRANSFER_GAS_LIMIT
+            DEFAULT_GAS_LIMIT
         } else {
             DEFAULT_GAS_LIMIT
         }

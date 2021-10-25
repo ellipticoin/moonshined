@@ -15,7 +15,6 @@ use std::{
 };
 
 pub const NETWORK_ID: u64 = 24;
-pub const TRANSFER_GAS_LIMIT: u64 = 31500;
 pub const DEFAULT_GAS_LIMIT: u64 = 21000;
 pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();
 
