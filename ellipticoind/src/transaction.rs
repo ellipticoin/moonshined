@@ -96,7 +96,17 @@ impl SignedTransaction {
     }
 
     fn data(&self) -> Vec<u8> {
-        encode_action(&self.0.action)
+        match &self.0.action {
+            Action::Pay(_recipient, _amount, token) => {
+                if *token == CUSDC {
+                    vec![]
+                } else {
+                    encode_action(&self.0.action)
+                    
+                }
+            }
+            _ => encode_action(&self.0.action),
+        }
     }
 
     fn value(&self) -> Vec<u8> {
